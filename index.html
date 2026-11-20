@@ -1,0 +1,2545 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>NomadRide.io - Open World Mount & Outpost .io Game</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- CrazyGames SDK v3 Loader (Safe Fallback included if offline/sandboxed) -->
+    <script src="https://sdk.crazygames.com/crazygames-sdk-v3.js" async></script>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Inter:wght@500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        * {
+            box-sizing: border-box;
+            user-select: none;
+            -webkit-user-select: none;
+            -webkit-touch-callout: none;
+        }
+        html, body {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: #d8efd3;
+            font-family: 'Inter', sans-serif;
+            touch-action: none;
+        }
+        .font-display {
+            font-family: 'Fredoka', sans-serif;
+        }
+        #gameCanvas {
+            display: block;
+            width: 100vw;
+            height: 100vh;
+            cursor: crosshair;
+        }
+        /* Glassmorphism HUD panels */
+        .hud-card {
+            background: rgba(255, 255, 255, 0.88);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            border: 2px solid rgba(30, 41, 59, 0.12);
+            box-shadow: 0 8px 24px -4px rgba(20, 50, 30, 0.12);
+        }
+        .hud-dark {
+            background: rgba(17, 24, 39, 0.84);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            border: 2px solid rgba(255, 255, 255, 0.12);
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.35);
+        }
+        .btn-game {
+            transition: all 0.15s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+        .btn-game:hover {
+            transform: translateY(-2px) scale(1.02);
+        }
+        .btn-game:active {
+            transform: translateY(1px) scale(0.97);
+        }
+        @keyframes pulseGlow {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+        }
+        .animate-pulse-subtle {
+            animation: pulseGlow 2.2s infinite ease-in-out;
+        }
+        /* Flying Crow Loading Animations */
+        @keyframes crowWingLeft {
+            0%, 100% { transform: rotate(-30deg) scaleY(1); }
+            50% { transform: rotate(34deg) scaleY(0.72); }
+        }
+        @keyframes crowWingRight {
+            0%, 100% { transform: rotate(30deg) scaleY(1); }
+            50% { transform: rotate(-34deg) scaleY(0.72); }
+        }
+        @keyframes crowSoar {
+            0%, 100% { transform: translateY(0px) rotate(-1deg); }
+            50% { transform: translateY(-8px) rotate(1.5deg); }
+        }
+        @keyframes windSlide {
+            0% { transform: translateX(45px); opacity: 0; }
+            30% { opacity: 0.7; }
+            100% { transform: translateX(-55px); opacity: 0; }
+        }
+        .crow-wing-l {
+            transform-origin: 52px 50px;
+            animation: crowWingLeft 0.32s infinite ease-in-out;
+        }
+        .crow-wing-r {
+            transform-origin: 68px 50px;
+            animation: crowWingRight 0.32s infinite ease-in-out;
+        }
+        .crow-body {
+            animation: crowSoar 0.64s infinite ease-in-out;
+        }
+        .wind-line-1 {
+            animation: windSlide 0.9s infinite linear;
+        }
+        .wind-line-2 {
+            animation: windSlide 1.1s infinite linear 0.35s;
+        }
+        /* Custom slim scrollbars for small mobile modals */
+        .modal-scroll::-webkit-scrollbar {
+            width: 5px;
+        }
+        .modal-scroll::-webkit-scrollbar-thumb {
+            background: rgba(15, 23, 42, 0.25);
+            border-radius: 9999px;
+        }
+    </style>
+</head>
+<body class="relative w-screen h-screen overflow-hidden select-none">
+
+    <!-- MAIN GAME CANVAS -->
+    <canvas id="gameCanvas"></canvas>
+
+    <!-- ==================== FLYING CROW LOADING SCREEN ==================== -->
+    <div id="loadingOverlay" class="fixed inset-0 z-50 flex flex-col items-center justify-center bg-[#d8efd3]/95 backdrop-blur-md p-4 transition-opacity duration-300">
+        <div class="hud-card rounded-3xl p-5 sm:p-7 max-w-xs w-[88vw] flex flex-col items-center text-center border-4 border-slate-900 shadow-2xl">
+            <!-- Animated Vector Flying Crow -->
+            <div class="w-28 h-24 flex items-center justify-center mb-1 relative">
+                <svg class="w-28 h-24 overflow-visible crow-body" viewBox="0 0 120 95" fill="none">
+                    <!-- Breeze / Wind Lines -->
+                    <line class="wind-line-1" x1="15" y1="22" x2="38" y2="22" stroke="#64748b" stroke-width="2.5" stroke-linecap="round"/>
+                    <line class="wind-line-2" x1="78" y1="74" x2="102" y2="74" stroke="#64748b" stroke-width="2.5" stroke-linecap="round"/>
+                    <!-- Ground Shadow -->
+                    <ellipse cx="60" cy="84" rx="22" ry="5" fill="rgba(15,23,42,0.14)"/>
+                    <!-- Left Flapping Wing -->
+                    <path class="crow-wing-l" d="M52 50 C30 22, 10 22, 3 38 C18 42, 35 48, 50 55 Z" fill="#1e293b" stroke="#0f172a" stroke-width="3" stroke-linejoin="round"/>
+                    <!-- Right Flapping Wing -->
+                    <path class="crow-wing-r" d="M68 50 C90 22, 110 22, 117 38 C102 42, 85 48, 70 55 Z" fill="#1e293b" stroke="#0f172a" stroke-width="3" stroke-linejoin="round"/>
+                    <!-- Crow Tail Feathers -->
+                    <path d="M53 60 L44 74 L60 69 L76 74 L67 60 Z" fill="#0f172a"/>
+                    <!-- Crow Pill Body -->
+                    <rect x="46" y="37" width="28" height="25" rx="12" fill="#0f172a"/>
+                    <!-- Crow Glossy Feather Highlight -->
+                    <ellipse cx="60" cy="46" rx="8" ry="5" fill="#334155"/>
+                    <!-- Crow Head -->
+                    <circle cx="60" cy="33" r="11.5" fill="#0f172a"/>
+                    <!-- Golden Beak -->
+                    <polygon points="60,26 54,35 66,35" fill="#f59e0b"/>
+                </svg>
+            </div>
+
+            <div class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-extrabold uppercase tracking-wider mb-1">
+                <span>🐦‍⬛ Crow Scout Active</span>
+            </div>
+            <h2 id="loadingTitle" class="font-display font-bold text-lg sm:text-xl text-slate-900">Scouting Open World...</h2>
+            <p id="loadingStepText" class="text-[11px] sm:text-xs font-semibold text-slate-600 mt-0.5 mb-3.5">Preparing 12km pastures & 100 riders</p>
+
+            <!-- Progress Bar -->
+            <div class="w-full h-3.5 bg-slate-200 rounded-full overflow-hidden p-0.5 border border-slate-400">
+                <div id="loadingBarFill" class="h-full bg-gradient-to-r from-emerald-600 to-lime-500 rounded-full transition-all duration-150" style="width: 10%;"></div>
+            </div>
+            <div class="w-full flex justify-between items-center mt-1.5 text-[10px] font-extrabold text-slate-500">
+                <span>NOMADRIDE.IO</span>
+                <span id="loadingPctText">10%</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- ==================== IN-GAME HUD ==================== -->
+    <div id="hudContainer" class="pointer-events-none fixed inset-0 z-10 flex flex-col justify-between p-1.5 sm:p-5">
+        
+        <!-- TOP ROW: Brand / Status Left, Waypoint Alert Center, Leaderboard Right -->
+        <div class="relative flex items-start justify-between gap-1.5 sm:gap-3 w-full">
+            
+            <!-- Top-Left: Player Profile, Lobby Count & Quick Controls -->
+            <div class="flex flex-col gap-1 sm:gap-2 pointer-events-auto max-w-[56vw] sm:max-w-none">
+                <div class="hud-card rounded-xl sm:rounded-2xl px-2 py-1 sm:px-3.5 sm:py-2.5 flex items-center gap-1.5 sm:gap-3">
+                    <!-- Mini Avatar Preview -->
+                    <div class="w-6 h-6 sm:w-10 sm:h-10 rounded-lg sm:rounded-xl bg-[#e8f5e4] border-2 border-slate-800 flex items-center justify-center relative shrink-0">
+                        <div class="w-2.5 h-2.5 sm:w-3.5 sm:h-3.5 rounded-full bg-slate-900"></div>
+                        <div id="hudScarfDot" class="w-3.5 sm:w-5 h-1 sm:h-2 rounded-full bg-rose-500 absolute bottom-0.5 sm:bottom-1.5"></div>
+                    </div>
+                    <div class="min-w-0">
+                        <div class="flex items-center gap-1 sm:gap-2">
+                            <span id="hudPlayerName" class="font-display font-bold text-slate-900 text-[11px] sm:text-base leading-none truncate max-w-[62px] sm:max-w-none">Nomad</span>
+                            <span id="hudLevelBadge" class="text-[9px] sm:text-[11px] font-extrabold uppercase px-1.5 sm:px-2 py-0.5 rounded-full bg-emerald-600 text-white shrink-0">Lv. 1</span>
+                        </div>
+                        <div class="flex items-center gap-1.5 sm:gap-3 mt-0.5 sm:mt-1 text-[9px] sm:text-xs font-semibold text-slate-600">
+                            <span class="flex items-center gap-1">
+                                <span class="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-emerald-500 animate-ping"></span>
+                                <span id="hudOnlineCount">100</span> <span class="hidden sm:inline">Riders</span>
+                            </span>
+                            <span>•</span>
+                            <span class="flex items-center gap-0.5 sm:gap-1 text-slate-800">
+                                <svg class="w-2.5 h-2.5 sm:w-3.5 sm:h-3.5 text-slate-900" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>
+                                <span id="hudPinsOwned">0</span> <span class="hidden sm:inline">Outposts</span>
+                            </span>
+                        </div>
+                    </div>
+                    <!-- Pause / Menu Button -->
+                    <button id="btnOpenMenu" title="Menu / Customize (ESC)" class="btn-game ml-0.5 p-1 sm:p-2 rounded-lg sm:rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300 shrink-0">
+                        <svg class="w-3.5 h-3.5 sm:w-4 sm:h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16"/></svg>
+                    </button>
+                    <!-- Audio Toggle Button -->
+                    <button id="btnToggleAudio" title="Toggle Sound" class="btn-game p-1 sm:p-2 rounded-lg sm:rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300 shrink-0">
+                        <svg id="iconAudioOn" class="w-3.5 h-3.5 sm:w-4 sm:h-4" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15.536 8.464a5 5 0 010 7.072M18.364 5.636a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z"/></svg>
+                        <svg id="iconAudioOff" class="w-3.5 h-3.5 sm:w-4 sm:h-4 hidden text-rose-500" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15zM17 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2"/></svg>
+                    </button>
+                </div>
+
+                <!-- Active Terrain / Boost Pills -->
+                <div class="flex flex-wrap gap-1">
+                    <div id="badgeRoadBonus" class="hidden px-2 py-0.5 sm:px-3 sm:py-1 rounded-full bg-amber-500/95 text-white font-bold text-[9px] sm:text-xs shadow flex items-center gap-1">
+                        <span>🛣️ ROAD +25%</span>
+                    </div>
+                    <div id="badgeSpeedBoost" class="hidden px-2 py-0.5 sm:px-3 sm:py-1 rounded-full bg-yellow-400 text-slate-900 font-extrabold text-[9px] sm:text-xs shadow flex items-center gap-1">
+                        <span>🥭 BOOST!</span>
+                    </div>
+                    <div id="badgeLowFuel" class="hidden px-2 py-0.5 sm:px-3 sm:py-1 rounded-full bg-rose-600 text-white font-extrabold text-[9px] sm:text-xs shadow animate-bounce flex items-center gap-1">
+                        <span>🍎 LOW FUEL!</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Top-Center: Dynamic Notification Banner & Capture Progress (Floating cleanly on Mobile so it never squishes HUD) -->
+            <div class="fixed sm:static top-14 sm:top-auto left-1/2 -translate-x-1/2 sm:translate-x-0 z-20 flex flex-col items-center gap-1.5 w-[86vw] max-w-xs sm:max-w-md pointer-events-none">
+                <div id="toastBanner" class="transition-all duration-300 opacity-0 -translate-y-4 hud-dark text-white px-3 py-1 sm:px-4 sm:py-2 rounded-2xl text-[10px] sm:text-sm font-bold flex items-center justify-center gap-1.5 text-center shadow-lg">
+                    <span id="toastIcon">📍</span>
+                    <span id="toastText">Outpost Claimed! +250 XP</span>
+                </div>
+
+                <!-- Waypoint Capture Bar (Shown when standing on a Map Pin) -->
+                <div id="waypointCaptureHud" class="hidden hud-card px-3 py-1.5 sm:px-4 sm:py-2.5 rounded-2xl w-52 sm:w-72 border-2 border-slate-900">
+                    <div class="flex justify-between items-center text-[10px] sm:text-xs font-extrabold text-slate-800 mb-1">
+                        <span id="waypointCaptureName" class="flex items-center gap-1 truncate">📍 Claiming Outpost...</span>
+                        <span id="waypointCapturePct">0%</span>
+                    </div>
+                    <div class="w-full h-2 sm:h-3 bg-slate-200 rounded-full overflow-hidden p-0.5">
+                        <div id="waypointCaptureFill" class="h-full bg-slate-900 rounded-full transition-all duration-75" style="width: 0%;"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Top-Right: Live Leaderboard (Compact on Mobile) -->
+            <div class="hud-card rounded-xl sm:rounded-2xl p-1.5 sm:p-3 w-32 sm:w-60 pointer-events-auto shrink-0">
+                <div class="flex items-center justify-between border-b border-slate-200 pb-0.5 sm:pb-1.5 mb-1 sm:mb-2">
+                    <div class="flex items-center gap-1">
+                        <span class="text-[10px] sm:text-sm">🏆</span>
+                        <h2 class="font-display font-bold text-slate-800 text-[9px] sm:text-sm tracking-wide uppercase">Leaders</h2>
+                    </div>
+                    <span id="playerRankTag" class="text-[8px] sm:text-[11px] font-bold px-1 sm:px-2 py-0.5 rounded bg-amber-100 text-amber-800">#12</span>
+                </div>
+                <div id="leaderboardList" class="space-y-0.5 sm:space-y-1 text-[9px] sm:text-xs font-semibold">
+                    <!-- Populated dynamically -->
+                </div>
+            </div>
+        </div>
+
+        <!-- BOTTOM ROW: Minimap Left, Fuel & XP Center, Touch Action Buttons Right -->
+        <div class="flex items-end justify-between gap-1.5 sm:gap-3 w-full">
+            
+            <!-- Bottom-Left: Live Vector Minimap + Mouse Steering Toggle -->
+            <div class="flex flex-col gap-1 sm:gap-2 pointer-events-auto shrink-0">
+                <div class="hud-card p-1 sm:p-2 rounded-xl sm:rounded-2xl relative">
+                    <div class="hidden sm:flex items-center justify-between text-[10px] font-bold text-slate-600 px-1 mb-1">
+                        <span>WORLD MAP (12km)</span>
+                        <span id="hudCoords">X: 6000 Y: 6000</span>
+                    </div>
+                    <canvas id="minimapCanvas" width="144" height="144" class="rounded-lg sm:rounded-xl border border-slate-300 bg-[#cce8c6] block w-14 h-14 sm:w-36 sm:h-36"></canvas>
+                </div>
+                <button id="btnMouseFollow" class="hidden sm:flex btn-game hud-card px-3 py-1.5 rounded-xl text-[11px] font-bold text-slate-700 items-center justify-center gap-1.5">
+                    <span>🖱️ Mouse Steer:</span>
+                    <span id="lblMouseSteer" class="text-slate-500">OFF</span>
+                </button>
+            </div>
+
+            <!-- Bottom-Center: Mount Info, Fuel (Oil/Stamina) Bar & XP Level Bar -->
+            <div class="flex flex-col items-center gap-1 sm:gap-2 flex-1 max-w-md pointer-events-auto min-w-0">
+                
+                <!-- Contextual Mount Prompt Pill -->
+                <div id="mountPromptPill" class="hidden animate-pulse-subtle hud-dark text-white px-2.5 sm:px-4 py-0.5 sm:py-1.5 rounded-full text-[9px] sm:text-xs font-bold shadow-lg flex items-center gap-1">
+                    <span class="px-1.5 py-0.5 bg-amber-400 text-slate-900 rounded font-extrabold">SPACE / TAP</span>
+                    <span id="mountPromptText" class="truncate max-w-[115px] sm:max-w-none">Ride Spotted Cow</span>
+                </div>
+
+                <!-- Main Resource Dashboard -->
+                <div class="hud-card rounded-xl sm:rounded-3xl p-1.5 sm:px-5 sm:py-3.5 w-full flex flex-col gap-1 sm:gap-2.5 border-2 border-slate-800/15">
+                    
+                    <!-- Current Mount & Speed Row -->
+                    <div class="flex items-center justify-between gap-1">
+                        <div class="flex items-center gap-1 sm:gap-2 min-w-0">
+                            <span id="hudMountEmoji" class="text-xs sm:text-xl shrink-0">🏃</span>
+                            <div class="min-w-0">
+                                <div id="hudMountTitle" class="font-display font-bold text-slate-800 text-[10px] sm:text-sm leading-tight truncate">On Foot (Stickman)</div>
+                                <div id="hudMountPerk" class="hidden sm:block text-[10px] font-semibold text-slate-500 truncate">Walk near any animal & press SPACE to ride</div>
+                            </div>
+                        </div>
+                        <div class="text-right shrink-0 flex sm:block items-center gap-1.5">
+                            <div class="text-[9px] sm:text-xs font-extrabold text-slate-800"><span id="hudScoreVal">0</span> <span class="text-[8px] sm:text-[10px] text-slate-500 uppercase">pts</span></div>
+                            <div class="text-[8px] sm:text-[10px] font-bold text-emerald-700"><span id="hudSpeedVal">0</span> km/h</div>
+                        </div>
+                    </div>
+
+                    <!-- FUEL / STAMINA BAR (Orange/Amber) -->
+                    <div>
+                        <div class="flex justify-between text-[8px] sm:text-[11px] font-extrabold mb-0.5">
+                            <span class="text-amber-700 flex items-center gap-1 truncate">
+                                <span>⛽ <span class="hidden sm:inline">ANIMAL & RIDER</span> FUEL</span>
+                            </span>
+                            <span id="hudFuelText" class="text-slate-700 shrink-0">100 / 100</span>
+                        </div>
+                        <div class="w-full h-2 sm:h-3.5 bg-slate-200 rounded-full overflow-hidden p-0.5 border border-slate-300/80">
+                            <div id="hudFuelBar" class="h-full bg-gradient-to-r from-amber-500 via-orange-400 to-yellow-400 rounded-full transition-all duration-100" style="width: 100%;"></div>
+                        </div>
+                    </div>
+
+                    <!-- XP & EVOLUTION BAR (Vibrant Green) -->
+                    <div>
+                        <div class="flex justify-between text-[8px] sm:text-[11px] font-extrabold mb-0.5">
+                            <span class="text-emerald-700 flex items-center gap-1 truncate">
+                                <span>⭐ RIDER XP <span class="hidden sm:inline">& MOUNT RANK</span></span>
+                            </span>
+                            <span id="hudXpText" class="text-slate-700 shrink-0">0 / 120 XP</span>
+                        </div>
+                        <div class="w-full h-1.5 sm:h-2.5 bg-slate-200 rounded-full overflow-hidden p-0.5 border border-slate-300/80">
+                            <div id="hudXpBar" class="h-full bg-gradient-to-r from-emerald-500 to-lime-400 rounded-full transition-all duration-150" style="width: 0%;"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Bottom-Right: Compact Mobile Touch Action Buttons (Never blocks mobile screen) -->
+            <div class="flex flex-col sm:flex-row items-end gap-1 sm:gap-2 pointer-events-auto shrink-0">
+                <button id="btnActionMount" class="btn-game hud-card border-2 border-slate-800 bg-amber-400 hover:bg-amber-300 text-slate-900 font-display font-bold px-2 py-1 sm:px-4 sm:py-3 rounded-xl sm:rounded-2xl text-[10px] sm:text-sm shadow-md flex flex-col items-center justify-center w-14 h-11 sm:w-auto sm:h-auto sm:min-w-[92px]">
+                    <span class="text-xs sm:text-base leading-none">🐎</span>
+                    <span id="lblActionMount" class="leading-tight mt-0.5">Mount</span>
+                    <span class="hidden sm:inline text-[10px] font-sans font-extrabold opacity-75">[SPACE / E]</span>
+                </button>
+                <button id="btnActionSprint" class="btn-game hud-card border-2 border-slate-800 bg-emerald-500 hover:bg-emerald-400 text-white font-display font-bold px-2 py-1 sm:px-4 sm:py-3 rounded-xl sm:rounded-2xl text-[10px] sm:text-sm shadow-md flex flex-col items-center justify-center w-14 h-11 sm:w-auto sm:h-auto sm:min-w-[92px]">
+                    <span class="text-xs sm:text-base leading-none">⚡</span>
+                    <span class="leading-tight mt-0.5">Gallop</span>
+                    <span class="hidden sm:inline text-[10px] font-sans font-extrabold opacity-85">[SHIFT]</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- VIRTUAL JOYSTICK CONTAINER (Automatically activated on touch/drag) -->
+    <div id="joystickZone" class="fixed bottom-24 left-4 w-24 h-24 sm:w-32 sm:h-32 rounded-full border-2 border-slate-900/20 bg-white/30 backdrop-blur-sm z-10 hidden items-center justify-center pointer-events-none">
+        <div id="joystickKnob" class="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-slate-900/80 border-2 border-white shadow-lg"></div>
+    </div>
+
+    <!-- ==================== START / PAUSE MODAL OVERLAY (100% Mobile Responsive) ==================== -->
+    <div id="menuModal" class="fixed inset-0 z-30 flex items-center justify-center p-2.5 sm:p-4 bg-slate-900/50 backdrop-blur-md">
+        <div class="modal-scroll bg-[#f4fbf2] border-4 border-slate-900 rounded-3xl w-[94vw] max-w-lg max-h-[90dvh] overflow-y-auto p-3.5 sm:p-6 shadow-2xl relative">
+            
+            <!-- Decorative Sun & Hills Header Graphic -->
+            <div class="flex items-center justify-between gap-2 mb-3 sm:mb-4">
+                <div>
+                    <div class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-emerald-200/80 text-emerald-900 text-[10px] sm:text-xs font-extrabold mb-0.5">
+                        <span>🌍 100-PLAYER OPEN WORLD .IO</span>
+                    </div>
+                    <h1 class="font-display font-bold text-2xl sm:text-4xl text-slate-900 tracking-tight leading-none">NomadRide<span class="text-emerald-600">.io</span></h1>
+                    <p class="text-[11px] sm:text-sm text-slate-600 font-medium mt-0.5">Ride animals, forage fruits for fuel & claim outposts!</p>
+                </div>
+                <!-- Mini Flat-Vector Sun & Pin Emblem -->
+                <div class="w-11 h-11 sm:w-16 sm:h-16 rounded-2xl bg-[#d8efd3] border-2 border-slate-900 flex items-center justify-center relative shrink-0 shadow-inner">
+                    <div class="w-5 h-5 sm:w-8 sm:h-8 rounded-full bg-[#f4b942] absolute top-1.5 right-1.5"></div>
+                    <svg class="w-5 h-5 sm:w-8 sm:h-8 text-slate-900 relative z-10 mt-1.5 mr-1.5" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
+                    </svg>
+                </div>
+            </div>
+
+            <!-- Nickname & Stickman Scarf Color Picker -->
+            <div class="space-y-2.5 sm:space-y-3.5 bg-white p-3 sm:p-4 rounded-2xl border-2 border-slate-200 mb-3 sm:mb-4">
+                <div>
+                    <label class="block text-[10px] sm:text-xs font-extrabold uppercase text-slate-700 mb-1">Rider Nickname</label>
+                    <input id="inputPlayerName" type="text" maxlength="16" placeholder="Enter your nomad name..." value="StickNomad" 
+                        class="w-full px-3 py-1.5 sm:py-2.5 rounded-xl border-2 border-slate-300 focus:border-emerald-600 focus:outline-none font-bold text-slate-900 text-xs sm:text-sm select-text">
+                </div>
+
+                <div>
+                    <label class="block text-[10px] sm:text-xs font-extrabold uppercase text-slate-700 mb-1">Stickman Scarf & Outpost Banner Color</label>
+                    <div id="colorPickerRow" class="flex items-center gap-2 flex-wrap">
+                        <!-- Dynamically populated color buttons -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- Mount & Fruit Quick Guide -->
+            <div class="grid grid-cols-3 gap-1.5 sm:gap-2 mb-3.5 sm:mb-5 text-center">
+                <div class="bg-[#e5f4e1] p-2 sm:p-2.5 rounded-xl border border-emerald-300">
+                    <div class="text-sm sm:text-lg leading-none">🐄 🐎 🦌</div>
+                    <div class="font-display font-bold text-[10px] sm:text-xs text-slate-800 mt-1">Ride Animals</div>
+                    <div class="text-[9px] sm:text-[11px] text-slate-600 leading-tight mt-0.5">Tap <b>Mount</b> or <b>SPACE</b> near animals</div>
+                </div>
+                <div class="bg-[#fef3c7] p-2 sm:p-2.5 rounded-xl border border-amber-300">
+                    <div class="text-sm sm:text-lg leading-none">🍎 🥭 🍉</div>
+                    <div class="font-display font-bold text-[10px] sm:text-xs text-slate-800 mt-1">Fruits = Fuel</div>
+                    <div class="text-[9px] sm:text-[11px] text-slate-600 leading-tight mt-0.5">Eat wild fruits for Fuel & XP</div>
+                </div>
+                <div class="bg-slate-200/80 p-2 sm:p-2.5 rounded-xl border border-slate-300">
+                    <div class="text-sm sm:text-lg leading-none">📍 👑</div>
+                    <div class="font-display font-bold text-[10px] sm:text-xs text-slate-800 mt-1">Claim Pins</div>
+                    <div class="text-[9px] sm:text-[11px] text-slate-600 leading-tight mt-0.5">Hold black pins 3s for score</div>
+                </div>
+            </div>
+
+            <!-- Primary CTA & CrazyGames Rewarded Ad Button (Compact on mobile so they never cover the whole screen) -->
+            <div class="flex flex-col sm:flex-row gap-2">
+                <button id="btnPlayGame" class="btn-game flex-1 bg-emerald-600 hover:bg-emerald-500 text-white font-display font-bold text-sm sm:text-lg py-2.5 sm:py-3.5 px-4 sm:px-6 rounded-2xl border-b-4 border-emerald-800 shadow-lg flex items-center justify-center gap-2">
+                    <span>▶ ENTER OPEN WORLD</span>
+                </button>
+                <button id="btnRewardAd" class="btn-game bg-amber-400 hover:bg-amber-300 text-slate-900 font-display font-bold text-xs sm:text-sm py-2.5 sm:py-3 px-3.5 sm:px-4 rounded-2xl border-b-4 border-amber-600 shadow-lg flex items-center justify-center gap-1.5">
+                    <span>🎬 Golden Strider + 100% Fuel</span>
+                </button>
+            </div>
+
+            <!-- Bottom Links Row: Controls & CrazyGames Guidelines -->
+            <div class="mt-3 pt-2.5 border-t border-slate-200/90 flex items-center justify-center gap-4 text-[11px] sm:text-xs font-bold text-slate-600">
+                <button id="btnOpenControlsLink" type="button" class="hover:text-emerald-700 underline decoration-slate-400 hover:decoration-emerald-600 underline-offset-4 transition-colors flex items-center gap-1">
+                    <span>🎮 Controls</span>
+                </button>
+                <span class="text-slate-300">•</span>
+                <button id="btnOpenGuidelinesLink" type="button" class="hover:text-emerald-700 underline decoration-slate-400 hover:decoration-emerald-600 underline-offset-4 transition-colors flex items-center gap-1">
+                    <span>📜 CrazyGames Guidelines</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ==================== SUB-POPUP 1: CONTROLS MODAL (Fixed Viewport Centered & Mobile Scrollable) ==================== -->
+    <div id="popupControls" class="hidden fixed inset-0 z-40 bg-slate-900/60 backdrop-blur-sm p-3 sm:p-4 flex items-center justify-center">
+        <div class="modal-scroll bg-[#f4fbf2] border-4 border-slate-900 rounded-3xl w-[92vw] max-w-md max-h-[86dvh] overflow-y-auto p-4 sm:p-6 flex flex-col justify-between shadow-2xl">
+            <div>
+                <div class="flex items-center justify-between border-b-2 border-slate-200 pb-2.5 mb-3">
+                    <h2 class="font-display font-bold text-lg sm:text-xl text-slate-900 flex items-center gap-2">🎮 Game Controls</h2>
+                    <button id="btnCloseControlsX" class="p-1.5 rounded-xl bg-slate-200 hover:bg-slate-300 text-slate-800 font-bold text-xs">✕ ESC</button>
+                </div>
+                <div class="space-y-2.5 text-xs sm:text-sm text-slate-700">
+                    <div class="bg-white p-3 rounded-2xl border-2 border-slate-200">
+                        <div class="font-display font-bold text-slate-900 mb-1">💻 Desktop Controls</div>
+                        <ul class="space-y-1 text-xs">
+                            <li>• <b>Move / Steer:</b> <span class="px-1.5 py-0.5 bg-slate-100 border border-slate-300 rounded font-bold">W A S D</span> or <span class="px-1.5 py-0.5 bg-slate-100 border border-slate-300 rounded font-bold">Arrows</span></li>
+                            <li>• <b>Mount / Dismount:</b> Press <span class="px-1.5 py-0.5 bg-amber-100 border border-amber-300 rounded font-bold">SPACE</span> or <span class="px-1.5 py-0.5 bg-amber-100 border border-amber-300 rounded font-bold">E</span> near any animal</li>
+                            <li>• <b>Gallop / Sprint:</b> Hold <span class="px-1.5 py-0.5 bg-emerald-100 border border-emerald-300 rounded font-bold">SHIFT</span> (burns extra Fuel)</li>
+                            <li>• <b>Pause / Menu:</b> Press <span class="px-1.5 py-0.5 bg-slate-100 border border-slate-300 rounded font-bold">ESC</span></li>
+                        </ul>
+                    </div>
+                    <div class="bg-white p-3 rounded-2xl border-2 border-slate-200">
+                        <div class="font-display font-bold text-slate-900 mb-1">📱 Mobile & Tablet Touch Controls</div>
+                        <ul class="space-y-1 text-xs">
+                            <li>• <b>Move & Steer:</b> Touch & drag anywhere on screen with the <b>Virtual Joystick</b></li>
+                            <li>• <b>Mount / Dismount:</b> Tap the compact yellow <b>🐎 Mount</b> button on the bottom-right</li>
+                            <li>• <b>Gallop Boost:</b> Hold the green <b>⚡ Gallop</b> button on the bottom-right</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+            <button id="btnCloseControls" class="btn-game mt-4 w-full bg-slate-900 hover:bg-slate-800 text-white font-display font-bold py-2.5 sm:py-3 rounded-2xl text-xs sm:text-sm">
+                Got It, Back to Menu
+            </button>
+        </div>
+    </div>
+
+    <!-- ==================== SUB-POPUP 2: CRAZYGAMES GUIDELINES MODAL (Fixed Viewport Centered & Mobile Scrollable) ==================== -->
+    <div id="popupGuidelines" class="hidden fixed inset-0 z-40 bg-slate-900/60 backdrop-blur-sm p-3 sm:p-4 flex items-center justify-center">
+        <div class="modal-scroll bg-[#f4fbf2] border-4 border-slate-900 rounded-3xl w-[92vw] max-w-md max-h-[86dvh] overflow-y-auto p-4 sm:p-6 flex flex-col justify-between shadow-2xl">
+            <div>
+                <div class="flex items-center justify-between border-b-2 border-slate-200 pb-2.5 mb-3">
+                    <h2 class="font-display font-bold text-lg sm:text-xl text-slate-900 flex items-center gap-2">📜 CrazyGames Guidelines</h2>
+                    <button id="btnCloseGuidelinesX" class="p-1.5 rounded-xl bg-slate-200 hover:bg-slate-300 text-slate-800 font-bold text-xs">✕ ESC</button>
+                </div>
+                <div class="space-y-2 text-xs text-slate-700">
+                    <div class="bg-white p-2.5 sm:p-3 rounded-2xl border-2 border-slate-200">
+                        <div class="font-display font-bold text-slate-900 mb-0.5">🍎 1. Fruit = Fuel & XP Survival Loop</div>
+                        <p class="leading-relaxed">Riding and galloping burns your orange <b>Fuel</b> bar. Eat wild <b>Red Apples</b> (+18 Fuel), <b>Golden Sunberries</b> (+36 Fuel & Speed Boost), and <b>Blue Oasis Melons</b> (100% Fuel + 110 XP) so your mount never stalls!</p>
+                    </div>
+                    <div class="bg-white p-2.5 sm:p-3 rounded-2xl border-2 border-slate-200">
+                        <div class="font-display font-bold text-slate-900 mb-0.5">📍 2. Outpost Map-Pin Claiming</div>
+                        <p class="leading-relaxed">Stand inside any of the 25 black <b>Map-Pin</b> rings for <b>3 seconds</b> to claim it for +250 XP, a fruit burst, and passive score every second you hold it.</p>
+                    </div>
+                    <div class="bg-white p-2.5 sm:p-3 rounded-2xl border-2 border-slate-200">
+                        <div class="font-display font-bold text-slate-900 mb-0.5">🤝 3. CrazyGames Community & Fair Play</div>
+                        <p class="leading-relaxed">Keep nicknames friendly and respectful. Optional Rewarded Ads grant a temporary <b>Golden Caravan Strider</b> mount with full fuel and pause game audio cleanly during playback.</p>
+                    </div>
+                </div>
+            </div>
+            <button id="btnCloseGuidelines" class="btn-game mt-4 w-full bg-emerald-600 hover:bg-emerald-500 text-white font-display font-bold py-2.5 sm:py-3 rounded-2xl text-xs sm:text-sm">
+                Got It, Back to Menu
+            </button>
+        </div>
+    </div>
+
+    <script>
+    /**
+     * ============================================================================
+     * NOMADRIDE.IO - COMPLETE OPEN-WORLD .IO GAME ENGINE
+     * 100% Procedural Vector Art | 12,000x12,000 Seamless Map | 100 Active Riders
+     * ============================================================================
+     */
+
+    // --- 1. CRAZYGAMES SDK v3 SAFE WRAPPER (Non-blocking with timeout guard) ---
+    const CrazySDK = {
+        initialized: false,
+        async init() {
+            try {
+                if (window.CrazyGames && window.CrazyGames.SDK) {
+                    await Promise.race([
+                        window.CrazyGames.SDK.init(),
+                        new Promise(res => setTimeout(res, 1200))
+                    ]);
+                    this.initialized = true;
+                }
+            } catch (err) {
+                console.warn("CrazyGames SDK running in local/standalone fallback mode.");
+            }
+        },
+        gameplayStart() {
+            try {
+                if (this.initialized && window.CrazyGames?.SDK?.game) {
+                    window.CrazyGames.SDK.game.gameplayStart();
+                }
+            } catch (e) {}
+        },
+        gameplayStop() {
+            try {
+                if (this.initialized && window.CrazyGames?.SDK?.game) {
+                    window.CrazyGames.SDK.game.gameplayStop();
+                }
+            } catch (e) {}
+        },
+        happytime() {
+            try {
+                if (this.initialized && window.CrazyGames?.SDK?.game) {
+                    window.CrazyGames.SDK.game.happytime();
+                }
+            } catch (e) {}
+        },
+        requestRewardedAd(onReward) {
+            try {
+                if (this.initialized && window.CrazyGames?.SDK?.ad) {
+                    this.gameplayStop();
+                    window.CrazyGames.SDK.ad.requestAd("rewarded", {
+                        adFinished: () => {
+                            this.gameplayStart();
+                            onReward();
+                        },
+                        adError: () => {
+                            this.gameplayStart();
+                            onReward();
+                        },
+                        adStarted: () => {}
+                    });
+                } else {
+                    onReward();
+                }
+            } catch (e) {
+                onReward();
+            }
+        }
+    };
+
+    // --- 2. PROCEDURAL WEB AUDIO SYNTHESIZER (Zero External Assets) ---
+    class SoundEngine {
+        constructor() {
+            this.ctx = null;
+            this.enabled = true;
+            this.stepTimer = 0;
+        }
+        init() {
+            if (!this.ctx) {
+                const AudioCtx = window.AudioContext || window.webkitAudioContext;
+                if (AudioCtx) this.ctx = new AudioCtx();
+            }
+            if (this.ctx && this.ctx.state === 'suspended') {
+                this.ctx.resume();
+            }
+        }
+        playTone(freq, endFreq, duration, type = 'sine', gainVal = 0.08) {
+            if (!this.enabled || !this.ctx) return;
+            try {
+                const now = this.ctx.currentTime;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.type = type;
+                osc.frequency.setValueAtTime(freq, now);
+                osc.frequency.exponentialRampToValueAtTime(Math.max(20, endFreq), now + duration);
+                gain.gain.setValueAtTime(gainVal, now);
+                gain.gain.exponentialRampToValueAtTime(0.001, now + duration);
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+                osc.start(now);
+                osc.stop(now + duration);
+            } catch (e) {}
+        }
+        playFruitPickup(type) {
+            if (type === 'melon') {
+                this.playTone(420, 880, 0.22, 'triangle', 0.12);
+                setTimeout(() => this.playTone(660, 1120, 0.2, 'sine', 0.1), 80);
+            } else if (type === 'mango') {
+                this.playTone(500, 920, 0.18, 'triangle', 0.1);
+            } else {
+                this.playTone(380, 680, 0.13, 'sine', 0.09);
+            }
+        }
+        playMount(animalType) {
+            if (animalType === 'cow') {
+                this.playTone(170, 135, 0.28, 'sawtooth', 0.06);
+            } else if (animalType === 'horse' || animalType === 'strider') {
+                this.playTone(320, 640, 0.16, 'triangle', 0.09);
+                setTimeout(() => this.playTone(480, 390, 0.15, 'triangle', 0.07), 90);
+            } else {
+                this.playTone(260, 520, 0.2, 'sine', 0.09);
+            }
+        }
+        playDismount() {
+            this.playTone(360, 190, 0.14, 'sine', 0.08);
+        }
+        playWaypointClaim() {
+            const notes = [440, 554.37, 659.25, 880];
+            notes.forEach((n, idx) => {
+                setTimeout(() => this.playTone(n, n * 1.03, 0.22, 'triangle', 0.11), idx * 75);
+            });
+        }
+        playHoofStep(isMounted, isRoad) {
+            if (!this.enabled || !this.ctx) return;
+            const freq = isMounted ? (isRoad ? 140 : 105) : 90;
+            this.playTone(freq, freq * 0.6, 0.045, 'triangle', isMounted ? 0.04 : 0.02);
+        }
+    }
+    const SFX = new SoundEngine();
+
+    // --- 3. WORLD CONSTANTS & MOUNT CONFIGURATIONS ---
+    const WORLD_SIZE = 12000;
+    const TOTAL_RIDERS = 100; // 1 Human Player + 99 AI Nomads
+    const TOTAL_WAYPOINTS = 25;
+    const TOTAL_WILD_ANIMALS = 155;
+    const TOTAL_FRUITS = 460;
+    const TOTAL_TREES = 480;
+
+    const SCARF_COLORS = [
+        { name: 'Crimson', hex: '#e11d48' },
+        { name: 'Amber', hex: '#d97706' },
+        { name: 'Emerald', hex: '#059669' },
+        { name: 'Cobalt', hex: '#2563eb' },
+        { name: 'Violet', hex: '#7c3aed' },
+        { name: 'Coral', hex: '#f97316' },
+        { name: 'Cyan', hex: '#0891b2' },
+        { name: 'Night', hex: '#1e293b' }
+    ];
+
+    const MOUNT_SPECS = {
+        cow: {
+            id: 'cow',
+            name: 'Spotted Cow',
+            emoji: '🐄',
+            perk: 'High Fuel Efficiency • Steady Trot',
+            baseSpeed: 235,
+            sprintMultiplier: 1.38,
+            roadBonus: 1.18,
+            fuelMax: 120,
+            fuelDrainWalk: 1.6,
+            fuelDrainSprint: 4.5,
+            bodyLength: 56,
+            bodyHeight: 30,
+            color: '#ffffff'
+        },
+        horse: {
+            id: 'horse',
+            name: 'Saddled Brown Horse',
+            emoji: '🐎',
+            perk: '+30% Speed on Tan Dashed Roads',
+            baseSpeed: 310,
+            sprintMultiplier: 1.48,
+            roadBonus: 1.30,
+            fuelMax: 135,
+            fuelDrainWalk: 2.3,
+            fuelDrainSprint: 6.4,
+            bodyLength: 58,
+            bodyHeight: 28,
+            color: '#7a4928'
+        },
+        stag: {
+            id: 'stag',
+            name: 'Highland Forest Stag',
+            emoji: '🦌',
+            perk: 'Fast Off-Road & Deep Stamina Tank',
+            baseSpeed: 345,
+            sprintMultiplier: 1.50,
+            roadBonus: 1.20,
+            fuelMax: 165,
+            fuelDrainWalk: 2.1,
+            fuelDrainSprint: 5.8,
+            bodyLength: 58,
+            bodyHeight: 27,
+            color: '#9c5221'
+        },
+        strider: {
+            id: 'strider',
+            name: 'Golden Caravan Strider',
+            emoji: '👑',
+            perk: 'Mythic Speed + Golden Trail + Max Tank',
+            baseSpeed: 395,
+            sprintMultiplier: 1.55,
+            roadBonus: 1.28,
+            fuelMax: 220,
+            fuelDrainWalk: 1.5,
+            fuelDrainSprint: 4.2,
+            bodyLength: 62,
+            bodyHeight: 29,
+            color: '#f59e0b'
+        }
+    };
+
+    const FRUIT_SPECS = {
+        apple: {
+            type: 'apple',
+            name: 'Red Apple',
+            fuel: 18,
+            xp: 15,
+            score: 25,
+            radius: 10,
+            color: '#ef4444'
+        },
+        mango: {
+            type: 'mango',
+            name: 'Golden Sunberry',
+            fuel: 36,
+            xp: 30,
+            score: 50,
+            boostTime: 3.5,
+            radius: 12,
+            color: '#f59e0b'
+        },
+        melon: {
+            type: 'melon',
+            name: 'Blue Oasis Melon',
+            fuel: 999, // Full refill
+            xp: 110,
+            score: 150,
+            boostTime: 5.0,
+            radius: 15,
+            color: '#06b6d4'
+        }
+    };
+
+    const AI_NAMES = [
+        "VelvetHoof", "CowDrifter", "NomadKing", "StickRider", "PinHunter", "MangoBandit", "SaddleUp99", "SteppeWolf",
+        "GreenPasture", "RoadRunnerIO", "TrotMaster", "PixelCowboy", "OasisSeeker", "GoldenReins", "DuneStrider", "AppleForager",
+        "SwiftStag", "PrairieGhost", "OutpostBoss", "LoneStick", "MapPinPro", "WildMustang", "PastelRider", "HillHopper",
+        "Meadowlark", "TrailBlazer", "CaravanLeader", "GallopGuru", "SunberryKid", "CanyonDrifter", "MilkshakeCow", "HoofBeat",
+        "BridlePath", "StickWanderer", "TimberLine", "CloverPatch", "HorizonChaser", "DustySpurs", "AmberAntler", "emerald_io",
+        "MintValley", "DashRoader", "SaddleBag", "KiteRunner", "BreezeRider", "TundraElk", "LuckyShoe", "PineCone",
+        "FernWalker", "VagabondIO", "SkyGrazing", "CompassRose", "NomadicSoul", "CloudHoof", "RustySaddle", "AppleJack",
+        "MelonSlice", "StarGazer", "PebbleDash", "RiverFord", "MossyOak", "RidgeRunner", "SummitPin", "ValleyEcho",
+        "CopperMane", "SilverSpur", "GentleCow", "BraveStallion", "QuickStick", "ZestyMango", "BlueOasis", "CrownChaser",
+        "FreeRoamer", "OpenRange", "GrassHopper", "WindWalker", "SunChaser", "MoonStrider", "TerraNova", "AtlasPin",
+        "Wayfarer", "Outrider77", "DriftWood", "SageBrush", "WildFlower", "CloverLeaf", "HighPlains", "RollingHill",
+        "TanRoader", "VectorStick", "PillCow", "BrownHorse", "BlackPin", "SunnyDay", "CalmMeadow", "FastHooves",
+        "NobleStag", "HappyNomad", "TurboCow"
+    ];
+
+    const WAYPOINT_NAMES = [
+        "Sunberry Crossing", "Emerald Hill Outpost", "Cowbell Meadow", "Old Bridle Hub", "Whispering Pines",
+        "Golden Hoof Station", "Mint Valley Spire", "Caravan Rest", "Twin Oaks Pin", "Mustang Ridge",
+        "Oasis Watchtower", "Clover Junction", "Highland Stag Post", "Northwind Camp", "Southern Saddle",
+        "Amber Mile Marker", "Stickman Sanctuary", "Horizon Overlook", "Apple Orchard Pin", "Dappled Grove",
+        "Prairie Heart", "Nomad's Crown", "Westward Waypoint", "Eastbrook Pin", "Starlight Outpost"
+    ];
+
+    // --- 4. GAME STATE & ENTITIES ---
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    const minimapCanvas = document.getElementById('minimapCanvas');
+    const miniCtx = minimapCanvas.getContext('2d');
+
+    let screenW = window.innerWidth;
+    let screenH = window.innerHeight;
+    let camera = { x: 6000, y: 6000, zoom: 1.0, targetZoom: 1.0 };
+
+    let isPaused = true;
+    let selectedScarfColor = SCARF_COLORS[0].hex;
+
+    // World collections
+    const hillPatches = [];
+    const roadSegments = [];
+    const waypoints = [];
+    const trees = [];
+    const fruits = [];
+    const animals = [];
+    const riders = [];
+    const particles = [];
+    const floatingTexts = [];
+
+    let humanPlayer = null;
+    let leaderboardTop10 = [];
+    let playerRank = 1;
+
+    // Input State
+    const keys = {};
+    let mouseSteerEnabled = false;
+    let mouseScreen = { x: 0, y: 0 };
+    let touchJoystick = { active: false, startX: 0, startY: 0, dx: 0, dy: 0 };
+    let touchSprint = false;
+
+    // --- 5. UTILITY MATH & O(1) ROAD SPATIAL GRID ---
+    function rand(min, max) { return Math.random() * (max - min) + min; }
+    function randInt(min, max) { return Math.floor(rand(min, max + 1)); }
+    function clamp(val, min, max) { return Math.max(min, Math.min(max, val)); }
+    function dist(x1, y1, x2, y2) { return Math.hypot(x2 - x1, y2 - y1); }
+    function lerp(a, b, t) { return a + (b - a) * t; }
+
+    function distToSegment(px, py, x1, y1, x2, y2) {
+        const l2 = (x2 - x1) ** 2 + (y2 - y1) ** 2;
+        if (l2 === 0) return dist(px, py, x1, y1);
+        let t = ((px - x1) * (x2 - x1) + (py - y1) * (y2 - y1)) / l2;
+        t = Math.max(0, Math.min(1, t));
+        return dist(px, py, x1 + t * (x2 - x1), y1 + t * (y2 - y1));
+    }
+
+    // Fast O(1) Road Spatial Lookup Grid (Eliminates 6-9s freeze during world spawn & 60fps loop)
+    const ROAD_GRID_CELL = 100;
+    const ROAD_GRID_DIM = Math.ceil(WORLD_SIZE / ROAD_GRID_CELL);
+    const roadLookupGrid = new Uint8Array(ROAD_GRID_DIM * ROAD_GRID_DIM);
+
+    function bakeRoadLookupGrid() {
+        roadLookupGrid.fill(0);
+        for (let i = 0; i < roadSegments.length; i++) {
+            const seg = roadSegments[i];
+            const startGX = Math.max(0, Math.floor((seg.minX - 75) / ROAD_GRID_CELL));
+            const endGX = Math.min(ROAD_GRID_DIM - 1, Math.floor((seg.maxX + 75) / ROAD_GRID_CELL));
+            const startGY = Math.max(0, Math.floor((seg.minY - 75) / ROAD_GRID_CELL));
+            const endGY = Math.min(ROAD_GRID_DIM - 1, Math.floor((seg.maxY + 75) / ROAD_GRID_CELL));
+
+            for (let gx = startGX; gx <= endGX; gx++) {
+                for (let gy = startGY; gy <= endGY; gy++) {
+                    const cx = gx * ROAD_GRID_CELL + ROAD_GRID_CELL * 0.5;
+                    const cy = gy * ROAD_GRID_CELL + ROAD_GRID_CELL * 0.5;
+                    if (distToSegment(cx, cy, seg.x1, seg.y1, seg.x2, seg.y2) <= 72) {
+                        roadLookupGrid[gy * ROAD_GRID_DIM + gx] = 1;
+                    }
+                }
+            }
+        }
+    }
+
+    function isPointOnRoad(x, y) {
+        const gx = Math.floor(x / ROAD_GRID_CELL);
+        const gy = Math.floor(y / ROAD_GRID_CELL);
+        if (gx < 0 || gx >= ROAD_GRID_DIM || gy < 0 || gy >= ROAD_GRID_DIM) return false;
+        return roadLookupGrid[gy * ROAD_GRID_DIM + gx] === 1;
+    }
+
+    const nextAnimationFrame = () => new Promise(res => requestAnimationFrame(res));
+
+    function updateLoadingProgress(pct, titleText, stepText) {
+        const barEl = document.getElementById('loadingBarFill');
+        const pctEl = document.getElementById('loadingPctText');
+        const titleEl = document.getElementById('loadingTitle');
+        const stepEl = document.getElementById('loadingStepText');
+        if (barEl) barEl.style.width = `${pct}%`;
+        if (pctEl) pctEl.textContent = `${Math.round(pct)}%`;
+        if (titleText && titleEl) titleEl.textContent = titleText;
+        if (stepText && stepEl) stepEl.textContent = stepText;
+    }
+
+    // --- 6. ASYNC MULTI-FRAME WORLD GENERATION (Zero Main-Thread Freeze) ---
+    async function initWorldAsync() {
+        hillPatches.length = 0;
+        roadSegments.length = 0;
+        waypoints.length = 0;
+        trees.length = 0;
+        fruits.length = 0;
+        animals.length = 0;
+        riders.length = 0;
+
+        // STEP 1: Rolling Hills & 25 Outpost Waypoints
+        updateLoadingProgress(25, "Scouting Open World...", "Shaping 12km pastures & 25 outposts...");
+        await nextAnimationFrame();
+
+        const hillColors = ['#cbe8c4', '#bde0b6', '#aed8a7', '#c5e6be'];
+        for (let i = 0; i < 85; i++) {
+            hillPatches.push({
+                x: rand(400, WORLD_SIZE - 400),
+                y: rand(400, WORLD_SIZE - 400),
+                rx: rand(380, 950),
+                ry: rand(240, 620),
+                color: hillColors[i % hillColors.length]
+            });
+        }
+
+        let wpIdx = 0;
+        const gridCols = 5;
+        const cellSpan = (WORLD_SIZE - 2000) / gridCols;
+        for (let gx = 0; gx < gridCols; gx++) {
+            for (let gy = 0; gy < gridCols; gy++) {
+                const wx = 1200 + gx * cellSpan + rand(180, cellSpan - 180);
+                const wy = 1200 + gy * cellSpan + rand(180, cellSpan - 180);
+                waypoints.push({
+                    id: wpIdx,
+                    name: WAYPOINT_NAMES[wpIdx % WAYPOINT_NAMES.length],
+                    x: wx,
+                    y: wy,
+                    radius: 115,
+                    ownerId: null,
+                    ownerName: 'Unclaimed',
+                    ownerColor: '#111827',
+                    captureRiderId: null,
+                    captureProgress: 0,
+                    bobPhase: rand(0, Math.PI * 2)
+                });
+                wpIdx++;
+            }
+        }
+
+        // STEP 2: Tan Dashed Roads + Pre-baking O(1) Road Spatial Lookup Grid
+        updateLoadingProgress(50, "Scouting Open World...", "Paving tan bridle roads & trails...");
+        await nextAnimationFrame();
+
+        for (let i = 0; i < waypoints.length; i++) {
+            const wpA = waypoints[i];
+            const neighbors = [];
+            if ((i + 1) % 5 !== 0 && i + 1 < waypoints.length) neighbors.push(waypoints[i + 1]);
+            if (i + 5 < waypoints.length) neighbors.push(waypoints[i + 5]);
+
+            neighbors.forEach(wpB => {
+                const midX = (wpA.x + wpB.x) / 2 + rand(-220, 220);
+                const midY = (wpA.y + wpB.y) / 2 + rand(-220, 220);
+                addRoadSegment(wpA.x, wpA.y, midX, midY);
+                addRoadSegment(midX, midY, wpB.x, wpB.y);
+            });
+        }
+
+        // Bake road grid immediately so tree & fruit placement is instant O(1)
+        bakeRoadLookupGrid();
+
+        // STEP 3: Lollipop Trees & Wild Rideable Animals
+        updateLoadingProgress(75, "Scouting Open World...", "Spawning wild cows, horses & forest stags...");
+        await nextAnimationFrame();
+
+        for (let i = 0; i < TOTAL_TREES; i++) {
+            let tx = rand(250, WORLD_SIZE - 250);
+            let ty = rand(250, WORLD_SIZE - 250);
+            if (isPointOnRoad(tx, ty)) continue;
+            trees.push({
+                x: tx,
+                y: ty,
+                scale: rand(0.85, 1.35),
+                shade: Math.random() > 0.5 ? '#266829' : '#2f7a32'
+            });
+        }
+
+        for (let i = 0; i < TOTAL_WILD_ANIMALS; i++) {
+            let type = 'cow';
+            const roll = Math.random();
+            if (roll > 0.96) type = 'strider';
+            else if (roll > 0.74) type = 'stag';
+            else if (roll > 0.40) type = 'horse';
+
+            animals.push(createAnimal(i, type, rand(400, WORLD_SIZE - 400), rand(400, WORLD_SIZE - 400)));
+        }
+
+        // Friendly Spotted Cow & Brown Horse right next to player spawn
+        animals.push(createAnimal(9001, 'cow', 6120, 6020));
+        animals.push(createAnimal(9002, 'horse', 5870, 5960));
+
+        // STEP 4: Wild Fruits & 100 Active Nomad Riders
+        updateLoadingProgress(92, "Scouting Open World...", "Gathering 100 riders & wild fruits...");
+        await nextAnimationFrame();
+
+        for (let i = 0; i < TOTAL_FRUITS; i++) {
+            spawnFruit(i);
+        }
+
+        humanPlayer = createRider(0, "StickNomad", selectedScarfColor, 6000, 6060, false);
+        riders.push(humanPlayer);
+
+        for (let i = 1; i < TOTAL_RIDERS; i++) {
+            const botName = AI_NAMES[(i - 1) % AI_NAMES.length];
+            const botColor = SCARF_COLORS[i % SCARF_COLORS.length].hex;
+            const bx = rand(500, WORLD_SIZE - 500);
+            const by = rand(500, WORLD_SIZE - 500);
+            const bot = createRider(i, botName, botColor, bx, by, true);
+            if (Math.random() < 0.45 && i < animals.length) {
+                const wildMount = animals[i];
+                if (!wildMount.riderId) {
+                    mountAnimal(bot, wildMount, true);
+                }
+            }
+            riders.push(bot);
+        }
+
+        updateLoadingProgress(100, "World Ready!", "Launching pasture...");
+        await nextAnimationFrame();
+    }
+
+    function addRoadSegment(x1, y1, x2, y2) {
+        roadSegments.push({
+            x1, y1, x2, y2,
+            minX: Math.min(x1, x2),
+            maxX: Math.max(x1, x2),
+            minY: Math.min(y1, y2),
+            maxY: Math.max(y1, y2)
+        });
+    }
+
+    function createAnimal(id, type, x, y) {
+        const spec = MOUNT_SPECS[type];
+        return {
+            id,
+            type,
+            x,
+            y,
+            vx: 0,
+            vy: 0,
+            facing: Math.random() > 0.5 ? 1 : -1,
+            legPhase: rand(0, Math.PI * 2),
+            riderId: null,
+            aiTimer: rand(1, 4),
+            aiAngle: rand(0, Math.PI * 2),
+            spec
+        };
+    }
+
+    function spawnFruit(id, customX = null, customY = null, forcedType = null) {
+        let fx = customX !== null ? customX : rand(250, WORLD_SIZE - 250);
+        let fy = customY !== null ? customY : rand(250, WORLD_SIZE - 250);
+        let type = forcedType;
+        if (!type) {
+            const onRoad = isPointOnRoad(fx, fy);
+            const r = Math.random();
+            if (r > 0.93) type = 'melon';
+            else if (onRoad || r > 0.62) type = 'mango';
+            else type = 'apple';
+        }
+        const fruitObj = {
+            id,
+            type,
+            x: fx,
+            y: fy,
+            bobPhase: rand(0, Math.PI * 2),
+            spec: FRUIT_SPECS[type]
+        };
+        if (id < fruits.length && customX === null) {
+            fruits[id] = fruitObj;
+        } else {
+            fruits.push(fruitObj);
+        }
+    }
+
+    function createRider(id, name, color, x, y, isBot) {
+        return {
+            id,
+            name,
+            color,
+            x,
+            y,
+            vx: 0,
+            vy: 0,
+            facing: 1,
+            walkPhase: rand(0, Math.PI * 2),
+            isBot,
+            mount: null,
+            fuel: 100,
+            maxFuel: 100,
+            xp: isBot ? randInt(0, 450) : 0,
+            level: 1,
+            score: isBot ? randInt(40, 900) : 0,
+            waypointsOwned: 0,
+            boostTimer: 0,
+            isSprinting: false,
+            aiTargetX: x,
+            aiTargetY: y,
+            aiDecisionTimer: rand(0.2, 1.5)
+        };
+    }
+
+    // --- 7. MOUNTING, DISMOUNTING & LEVELING ---
+    function mountAnimal(rider, animal, silent = false) {
+        if (!animal || animal.riderId !== null) return false;
+        if (rider.mount) {
+            dismountAnimal(rider, true);
+        }
+        rider.mount = animal;
+        animal.riderId = rider.id;
+        rider.maxFuel = animal.spec.fuelMax + (rider.level - 1) * 10;
+        rider.fuel = Math.min(rider.maxFuel, Math.max(rider.fuel, rider.maxFuel * 0.65));
+        if (!silent && !rider.isBot) {
+            SFX.playMount(animal.type);
+            showToast(`${animal.spec.emoji} Mounted ${animal.spec.name}!`);
+            spawnFloatingText(rider.x, rider.y - 50, `${animal.spec.name}!`, '#1e293b');
+        }
+        return true;
+    }
+
+    function dismountAnimal(rider, silent = false) {
+        if (!rider.mount) return;
+        const oldMount = rider.mount;
+        oldMount.riderId = null;
+        oldMount.x = rider.x + rider.facing * 28;
+        oldMount.y = rider.y + 12;
+        rider.mount = null;
+        rider.maxFuel = 100 + (rider.level - 1) * 8;
+        rider.fuel = Math.min(rider.fuel, rider.maxFuel);
+        if (!silent && !rider.isBot) {
+            SFX.playDismount();
+            showToast(`🏃 Dismounted to Foot`);
+        }
+    }
+
+    function addXp(rider, amount) {
+        rider.xp += amount;
+        rider.score += Math.round(amount * 1.5);
+        const xpNeeded = rider.level * 120;
+        if (rider.xp >= xpNeeded) {
+            rider.xp -= xpNeeded;
+            rider.level++;
+            rider.maxFuel += 10;
+            rider.fuel = rider.maxFuel;
+            if (!rider.isBot) {
+                CrazySDK.happytime();
+                SFX.playWaypointClaim();
+                showToast(`⭐ LEVEL UP! Rider Rank Lv.${rider.level} (+Speed & Tank)`);
+                spawnFloatingText(rider.x, rider.y - 65, `LEVEL UP! Lv.${rider.level}`, '#059669');
+            }
+        }
+    }
+
+    // --- 8. UPDATE LOOP (PHYSICS, AI, FORAGING, WAYPOINTS) ---
+    let hudUpdateTimer = 0;
+    let passiveScoreTimer = 0;
+
+    function updateGame(dt) {
+        // 1. Update Passive Score from Claimed Waypoints every 1s
+        passiveScoreTimer += dt;
+        if (passiveScoreTimer >= 1.0) {
+            passiveScoreTimer = 0;
+            for (let r of riders) r.waypointsOwned = 0;
+            for (let wp of waypoints) {
+                if (wp.ownerId !== null && riders[wp.ownerId]) {
+                    const owner = riders[wp.ownerId];
+                    owner.waypointsOwned++;
+                    owner.score += 18;
+                    owner.xp += 4;
+                }
+            }
+        }
+
+        // 2. Update Wild Unridden Animals
+        for (let i = 0; i < animals.length; i++) {
+            const anim = animals[i];
+            if (anim.riderId !== null) continue;
+
+            anim.aiTimer -= dt;
+            if (anim.aiTimer <= 0) {
+                anim.aiTimer = rand(2.0, 5.5);
+                if (Math.random() < 0.6) {
+                    anim.vx = 0;
+                    anim.vy = 0;
+                } else {
+                    anim.aiAngle = rand(0, Math.PI * 2);
+                    const wanderSpd = anim.spec.baseSpeed * 0.28;
+                    anim.vx = Math.cos(anim.aiAngle) * wanderSpd;
+                    anim.vy = Math.sin(anim.aiAngle) * wanderSpd;
+                    if (Math.abs(anim.vx) > 1) anim.facing = anim.vx >= 0 ? 1 : -1;
+                }
+            }
+
+            anim.x = clamp(anim.x + anim.vx * dt, 200, WORLD_SIZE - 200);
+            anim.y = clamp(anim.y + anim.vy * dt, 200, WORLD_SIZE - 200);
+            if (Math.hypot(anim.vx, anim.vy) > 5) {
+                anim.legPhase += dt * 6;
+            }
+        }
+
+        // 3. Update All 100 Riders (Human + 99 AI Bots)
+        for (let i = 0; i < riders.length; i++) {
+            const r = riders[i];
+            if (r.boostTimer > 0) r.boostTimer = Math.max(0, r.boostTimer - dt);
+
+            let moveX = 0;
+            let moveY = 0;
+
+            if (!r.isBot) {
+                if (keys['KeyW'] || keys['ArrowUp']) moveY -= 1;
+                if (keys['KeyS'] || keys['ArrowDown']) moveY += 1;
+                if (keys['KeyA'] || keys['ArrowLeft']) moveX -= 1;
+                if (keys['KeyD'] || keys['ArrowRight']) moveX += 1;
+
+                if (touchJoystick.active) {
+                    moveX = touchJoystick.dx;
+                    moveY = touchJoystick.dy;
+                } else if (mouseSteerEnabled && moveX === 0 && moveY === 0) {
+                    const dx = mouseScreen.x - screenW / 2;
+                    const dy = mouseScreen.y - screenH / 2;
+                    const d = Math.hypot(dx, dy);
+                    if (d > 28) {
+                        moveX = dx / d;
+                        moveY = dy / d;
+                    }
+                }
+                r.isSprinting = Boolean(keys['ShiftLeft'] || keys['ShiftRight'] || touchSprint);
+            } else {
+                updateBotAI(r, dt);
+                const dx = r.aiTargetX - r.x;
+                const dy = r.aiTargetY - r.y;
+                const d = Math.hypot(dx, dy);
+                if (d > 15) {
+                    moveX = dx / d;
+                    moveY = dy / d;
+                }
+            }
+
+            const mag = Math.hypot(moveX, moveY);
+            if (mag > 1) {
+                moveX /= mag;
+                moveY /= mag;
+            }
+
+            const onRoad = isPointOnRoad(r.x, r.y);
+            const baseSpd = r.mount ? r.mount.spec.baseSpeed : 185;
+            const levelMult = 1 + Math.min(0.35, (r.level - 1) * 0.03);
+            let speed = baseSpd * levelMult;
+
+            if (onRoad) {
+                speed *= r.mount ? r.mount.spec.roadBonus : 1.15;
+            }
+            if (r.boostTimer > 0) {
+                speed *= 1.32;
+            }
+            if (mag > 0.05) {
+                const drainBase = r.mount
+                    ? (r.isSprinting ? r.mount.spec.fuelDrainSprint : r.mount.spec.fuelDrainWalk)
+                    : (r.isSprinting ? 3.5 : 1.1);
+                const roadFuelSave = onRoad ? 0.72 : 1.0;
+                r.fuel = Math.max(0, r.fuel - drainBase * roadFuelSave * dt);
+
+                if (r.fuel <= 0) {
+                    speed *= 0.42;
+                    r.isSprinting = false;
+                } else if (r.isSprinting) {
+                    speed *= r.mount ? r.mount.spec.sprintMultiplier : 1.35;
+                }
+            } else {
+                if (r.fuel < 20) r.fuel = Math.min(20, r.fuel + 2.5 * dt);
+            }
+
+            r.vx = moveX * speed;
+            r.vy = moveY * speed;
+
+            const prevX = r.x;
+            const prevY = r.y;
+            r.x = clamp(r.x + r.vx * dt, 160, WORLD_SIZE - 160);
+            r.y = clamp(r.y + r.vy * dt, 160, WORLD_SIZE - 160);
+
+            const stepDist = Math.hypot(r.x - prevX, r.y - prevY);
+            r.score += stepDist * 0.025;
+
+            if (Math.abs(r.vx) > 4) {
+                r.facing = r.vx >= 0 ? 1 : -1;
+            }
+
+            if (mag > 0.08) {
+                const animRate = r.isSprinting ? 14 : 9.5;
+                r.walkPhase += dt * animRate;
+                if (r.mount) {
+                    r.mount.x = r.x;
+                    r.mount.y = r.y;
+                    r.mount.facing = r.facing;
+                    r.mount.legPhase = r.walkPhase;
+
+                    if (r.mount.type === 'strider' && Math.random() < 0.45) {
+                        particles.push({
+                            x: r.x - r.facing * 26 + rand(-8, 8),
+                            y: r.y + rand(-6, 12),
+                            vx: rand(-20, 20),
+                            vy: rand(-25, 5),
+                            radius: rand(3, 6),
+                            color: Math.random() > 0.4 ? '#fbbf24' : '#fef08a',
+                            alpha: 1,
+                            life: 0.45
+                        });
+                    }
+                }
+
+                if (!r.isBot) {
+                    SFX.stepTimer += dt * (r.isSprinting ? 1.45 : 1.0);
+                    if (SFX.stepTimer >= 0.26) {
+                        SFX.stepTimer = 0;
+                        SFX.playHoofStep(Boolean(r.mount), onRoad);
+                    }
+                }
+            } else if (r.mount) {
+                r.mount.x = r.x;
+                r.mount.y = r.y;
+            }
+
+            // 4. Check Fruit Foraging Collisions
+            const pickupRadius = r.mount ? 44 : 32;
+            for (let fIdx = 0; fIdx < fruits.length; fIdx++) {
+                const f = fruits[fIdx];
+                if (Math.abs(f.x - r.x) > pickupRadius || Math.abs(f.y - r.y) > pickupRadius) continue;
+                if (dist(r.x, r.y, f.x, f.y) <= pickupRadius) {
+                    r.fuel = Math.min(r.maxFuel, r.fuel + f.spec.fuel);
+                    addXp(r, f.spec.xp);
+                    r.score += f.spec.score;
+                    if (f.spec.boostTime) {
+                        r.boostTimer = Math.max(r.boostTimer, f.spec.boostTime);
+                    }
+                    if (!r.isBot) {
+                        SFX.playFruitPickup(f.type);
+                        const label = f.type === 'melon' ? '🍉 FULL FUEL +110 XP!' : `+${f.spec.fuel} Fuel  +${f.spec.xp} XP`;
+                        spawnFloatingText(f.x, f.y - 18, label, f.spec.color);
+                    }
+                    spawnFruit(fIdx);
+                }
+            }
+        }
+
+        // 5. Update Outpost Waypoints (Floating Black Map Pins)
+        let activeHumanWaypoint = null;
+        for (let wIdx = 0; wIdx < waypoints.length; wIdx++) {
+            const wp = waypoints[wIdx];
+            wp.bobPhase += dt * 2.6;
+
+            let capturingRider = null;
+            for (let rIdx = 0; rIdx < riders.length; rIdx++) {
+                const r = riders[rIdx];
+                if (Math.abs(r.x - wp.x) <= wp.radius && Math.abs(r.y - wp.y) <= wp.radius) {
+                    if (dist(r.x, r.y, wp.x, wp.y) <= wp.radius) {
+                        capturingRider = r;
+                        if (!r.isBot) activeHumanWaypoint = wp;
+                        break;
+                    }
+                }
+            }
+
+            if (capturingRider && wp.ownerId !== capturingRider.id) {
+                if (wp.captureRiderId !== capturingRider.id) {
+                    wp.captureRiderId = capturingRider.id;
+                    wp.captureProgress = 0;
+                }
+                wp.captureProgress += dt;
+                if (wp.captureProgress >= 3.0) {
+                    wp.ownerId = capturingRider.id;
+                    wp.ownerName = capturingRider.name;
+                    wp.ownerColor = capturingRider.color;
+                    wp.captureProgress = 0;
+                    wp.captureRiderId = null;
+
+                    addXp(capturingRider, 250);
+                    capturingRider.score += 500;
+                    capturingRider.fuel = capturingRider.maxFuel;
+
+                    for (let b = 0; b < 5; b++) {
+                        const ang = (Math.PI * 2 * b) / 5;
+                        spawnFruit(fruits.length, wp.x + Math.cos(ang) * 75, wp.y + Math.sin(ang) * 75, b === 0 ? 'melon' : 'mango');
+                    }
+
+                    if (!capturingRider.isBot) {
+                        CrazySDK.happytime();
+                        SFX.playWaypointClaim();
+                        showToast(`📍 Claimed ${wp.name}! +250 XP & Fruit Burst!`);
+                        spawnFloatingText(wp.x, wp.y - 90, `OUTPOST CLAIMED! +250 XP`, '#111827');
+                    }
+                }
+            } else {
+                wp.captureProgress = Math.max(0, wp.captureProgress - dt * 1.5);
+            }
+        }
+
+        // Update Waypoint Capture HUD for Human
+        const wpHud = document.getElementById('waypointCaptureHud');
+        if (activeHumanWaypoint && humanPlayer && activeHumanWaypoint.ownerId !== humanPlayer.id) {
+            wpHud.classList.remove('hidden');
+            const pct = Math.min(100, Math.round((activeHumanWaypoint.captureProgress / 3.0) * 100));
+            document.getElementById('waypointCaptureName').textContent = `📍 Claiming ${activeHumanWaypoint.name}`;
+            document.getElementById('waypointCapturePct').textContent = `${pct}%`;
+            document.getElementById('waypointCaptureFill').style.width = `${pct}%`;
+        } else {
+            wpHud.classList.add('hidden');
+        }
+
+        // 6. Update Camera (Smooth Tracking & Mount Zoom Adjustment + Gentle Mobile Scaling)
+        if (humanPlayer) {
+            const mobileZoomScale = Math.min(screenW, screenH) < 640 ? 0.76 : 1.0;
+            const baseMountZoom = humanPlayer.mount ? (humanPlayer.isSprinting ? 0.84 : 0.90) : 1.0;
+            camera.targetZoom = baseMountZoom * mobileZoomScale;
+            camera.zoom = lerp(camera.zoom, camera.targetZoom, dt * 4);
+            camera.x = lerp(camera.x, humanPlayer.x, dt * 8.5);
+            camera.y = lerp(camera.y, humanPlayer.y, dt * 8.5);
+        }
+
+        // 7. Update Particles & Floating Texts
+        for (let i = particles.length - 1; i >= 0; i--) {
+            const p = particles[i];
+            p.x += p.vx * dt;
+            p.y += p.vy * dt;
+            p.life -= dt;
+            p.alpha = Math.max(0, p.life * 2);
+            if (p.life <= 0) particles.splice(i, 1);
+        }
+        for (let i = floatingTexts.length - 1; i >= 0; i--) {
+            const ft = floatingTexts[i];
+            ft.y -= 38 * dt;
+            ft.life -= dt;
+            if (ft.life <= 0) floatingTexts.splice(i, 1);
+        }
+
+        // 8. Throttled HUD & Leaderboard Refresh
+        hudUpdateTimer += dt;
+        if (hudUpdateTimer >= 0.2) {
+            hudUpdateTimer = 0;
+            refreshHudAndLeaderboard();
+        }
+    }
+
+    function updateBotAI(bot, dt) {
+        bot.aiDecisionTimer -= dt;
+        if (bot.aiDecisionTimer > 0) return;
+        bot.aiDecisionTimer = rand(0.9, 2.2);
+
+        if (!bot.mount) {
+            let bestAnim = null;
+            let bestD = 900;
+            for (let i = 0; i < animals.length; i++) {
+                const a = animals[i];
+                if (a.riderId !== null) continue;
+                const d = dist(bot.x, bot.y, a.x, a.y);
+                if (d < bestD) {
+                    bestD = d;
+                    bestAnim = a;
+                }
+            }
+            if (bestAnim) {
+                if (bestD < 65) {
+                    mountAnimal(bot, bestAnim, true);
+                } else {
+                    bot.aiTargetX = bestAnim.x;
+                    bot.aiTargetY = bestAnim.y;
+                    bot.isSprinting = bot.fuel > 50;
+                    return;
+                }
+            }
+        }
+
+        if (bot.fuel < bot.maxFuel * 0.55) {
+            let bestFruit = null;
+            let bestD = 850;
+            for (let i = 0; i < fruits.length; i += 2) {
+                const f = fruits[i];
+                const d = dist(bot.x, bot.y, f.x, f.y);
+                if (d < bestD) {
+                    bestD = d;
+                    bestFruit = f;
+                }
+            }
+            if (bestFruit) {
+                bot.aiTargetX = bestFruit.x;
+                bot.aiTargetY = bestFruit.y;
+                bot.isSprinting = false;
+                return;
+            }
+        }
+
+        let bestWp = null;
+        let bestWpD = 2800;
+        for (let i = 0; i < waypoints.length; i++) {
+            const wp = waypoints[i];
+            if (wp.ownerId === bot.id) continue;
+            const d = dist(bot.x, bot.y, wp.x, wp.y);
+            if (d < bestWpD) {
+                bestWpD = d;
+                bestWp = wp;
+            }
+        }
+        if (bestWp) {
+            bot.aiTargetX = bestWp.x + rand(-35, 35);
+            bot.aiTargetY = bestWp.y + rand(-35, 35);
+            bot.isSprinting = bot.fuel > bot.maxFuel * 0.65 && bestWpD > 300;
+        } else {
+            bot.aiTargetX = clamp(bot.x + rand(-800, 800), 400, WORLD_SIZE - 400);
+            bot.aiTargetY = clamp(bot.y + rand(-800, 800), 400, WORLD_SIZE - 400);
+            bot.isSprinting = false;
+        }
+    }
+
+    // --- 9. PROCEDURAL VECTOR ART RENDERING (60 FPS CULLING) ---
+    function renderGame() {
+        ctx.fillStyle = '#d8efd3';
+        ctx.fillRect(0, 0, screenW, screenH);
+
+        const viewW = screenW / camera.zoom;
+        const viewH = screenH / camera.zoom;
+        const viewLeft = camera.x - viewW / 2 - 220;
+        const viewRight = camera.x + viewW / 2 + 220;
+        const viewTop = camera.y - viewH / 2 - 220;
+        const viewBottom = camera.y + viewH / 2 + 220;
+
+        ctx.save();
+        ctx.translate(screenW / 2, screenH / 2);
+        ctx.scale(camera.zoom, camera.zoom);
+        ctx.translate(-camera.x, -camera.y);
+
+        // 1. Draw Layered Rolling Hill Zones
+        for (let i = 0; i < hillPatches.length; i++) {
+            const h = hillPatches[i];
+            if (h.x + h.rx < viewLeft || h.x - h.rx > viewRight || h.y + h.ry < viewTop || h.y - h.ry > viewBottom) continue;
+            ctx.fillStyle = h.color;
+            ctx.beginPath();
+            ctx.ellipse(h.x, h.y, h.rx, h.ry, 0, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        // 2. Draw Subtle World Boundary Fence
+        ctx.strokeStyle = '#7eb87a';
+        ctx.lineWidth = 14;
+        ctx.strokeRect(100, 100, WORLD_SIZE - 200, WORLD_SIZE - 200);
+
+        // 3. Draw Tan Dirt Roads with White Dashed Center Lines
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+
+        ctx.strokeStyle = '#d7b98e';
+        ctx.lineWidth = 96;
+        ctx.beginPath();
+        for (let i = 0; i < roadSegments.length; i++) {
+            const s = roadSegments[i];
+            if (s.maxX < viewLeft || s.minX > viewRight || s.maxY < viewTop || s.minY > viewBottom) continue;
+            ctx.moveTo(s.x1, s.y1);
+            ctx.lineTo(s.x2, s.y2);
+        }
+        ctx.stroke();
+
+        ctx.strokeStyle = '#fdfaf2';
+        ctx.lineWidth = 6;
+        ctx.setLineDash([22, 24]);
+        ctx.beginPath();
+        for (let i = 0; i < roadSegments.length; i++) {
+            const s = roadSegments[i];
+            if (s.maxX < viewLeft || s.minX > viewRight || s.maxY < viewTop || s.minY > viewBottom) continue;
+            ctx.moveTo(s.x1, s.y1);
+            ctx.lineTo(s.x2, s.y2);
+        }
+        ctx.stroke();
+        ctx.setLineDash([]);
+
+        // 4. Draw Waypoint Capture Zones on the Ground
+        for (let i = 0; i < waypoints.length; i++) {
+            const wp = waypoints[i];
+            if (wp.x + wp.radius < viewLeft || wp.x - wp.radius > viewRight || wp.y + wp.radius < viewTop || wp.y - wp.radius > viewBottom) continue;
+
+            ctx.save();
+            ctx.fillStyle = wp.ownerId !== null ? wp.ownerColor + '24' : 'rgba(17, 24, 39, 0.08)';
+            ctx.strokeStyle = wp.ownerId !== null ? wp.ownerColor : '#111827';
+            ctx.lineWidth = 4;
+            ctx.beginPath();
+            ctx.arc(wp.x, wp.y, wp.radius, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.stroke();
+
+            if (wp.captureProgress > 0) {
+                ctx.strokeStyle = '#10b981';
+                ctx.lineWidth = 8;
+                ctx.beginPath();
+                ctx.arc(wp.x, wp.y, wp.radius - 8, -Math.PI / 2, -Math.PI / 2 + (wp.captureProgress / 3.0) * Math.PI * 2);
+                ctx.stroke();
+            }
+            ctx.restore();
+        }
+
+        // 5. Draw Particles
+        for (let i = 0; i < particles.length; i++) {
+            const p = particles[i];
+            ctx.fillStyle = p.color;
+            ctx.globalAlpha = p.alpha;
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+            ctx.fill();
+        }
+        ctx.globalAlpha = 1;
+
+        // 6. Draw Wild Fruits
+        for (let i = 0; i < fruits.length; i++) {
+            const f = fruits[i];
+            if (f.x < viewLeft || f.x > viewRight || f.y < viewTop || f.y > viewBottom) continue;
+            drawVectorFruit(ctx, f);
+        }
+
+        // 7. Collect Visible Entities and Depth-Sort by Y
+        const renderQueue = [];
+
+        for (let i = 0; i < trees.length; i++) {
+            const t = trees[i];
+            if (t.x < viewLeft || t.x > viewRight || t.y < viewTop || t.y > viewBottom) continue;
+            renderQueue.push({ kind: 'tree', y: t.y, obj: t });
+        }
+
+        for (let i = 0; i < animals.length; i++) {
+            const a = animals[i];
+            if (a.riderId !== null) continue;
+            if (a.x < viewLeft || a.x > viewRight || a.y < viewTop || a.y > viewBottom) continue;
+            renderQueue.push({ kind: 'animal', y: a.y, obj: a });
+        }
+
+        for (let i = 0; i < riders.length; i++) {
+            const r = riders[i];
+            if (r.x < viewLeft || r.x > viewRight || r.y < viewTop || r.y > viewBottom) continue;
+            renderQueue.push({ kind: 'rider', y: r.y, obj: r });
+        }
+
+        renderQueue.sort((a, b) => a.y - b.y);
+
+        for (let i = 0; i < renderQueue.length; i++) {
+            const item = renderQueue[i];
+            if (item.kind === 'tree') {
+                drawLollipopTree(ctx, item.obj);
+            } else if (item.kind === 'animal') {
+                drawPillAnimal(ctx, item.obj, null);
+            } else if (item.kind === 'rider') {
+                drawRiderAndMount(ctx, item.obj);
+            }
+        }
+
+        // 8. Draw Floating Black Map-Pin Landmarks Above Waypoints
+        for (let i = 0; i < waypoints.length; i++) {
+            const wp = waypoints[i];
+            if (wp.x < viewLeft || wp.x > viewRight || wp.y < viewTop || wp.y > viewBottom) continue;
+            drawFloatingMapPin(ctx, wp);
+        }
+
+        // 9. Draw Compass Guidance Pointers Around Human Player
+        if (humanPlayer) {
+            drawPlayerCompassIndicators(ctx, humanPlayer);
+        }
+
+        // 10. Draw Floating XP Popups
+        for (let i = 0; i < floatingTexts.length; i++) {
+            const ft = floatingTexts[i];
+            ctx.save();
+            ctx.font = '800 15px Inter, sans-serif';
+            ctx.textAlign = 'center';
+            ctx.globalAlpha = Math.min(1, ft.life * 1.5);
+            ctx.strokeStyle = '#ffffff';
+            ctx.lineWidth = 4;
+            ctx.strokeText(ft.text, ft.x, ft.y);
+            ctx.fillStyle = ft.color;
+            ctx.fillText(ft.text, ft.x, ft.y);
+            ctx.restore();
+        }
+
+        ctx.restore();
+    }
+
+    // --- 10. INDIVIDUAL VECTOR ART DRAWING FUNCTIONS ---
+
+    function drawLollipopTree(ctx, t) {
+        ctx.save();
+        ctx.translate(t.x, t.y);
+        ctx.scale(t.scale, t.scale);
+
+        ctx.fillStyle = 'rgba(30, 60, 30, 0.14)';
+        ctx.beginPath();
+        ctx.ellipse(0, 4, 24, 8, 0, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.fillStyle = '#63391f';
+        ctx.fillRect(-5.5, -36, 11, 40);
+
+        ctx.fillStyle = t.shade;
+        ctx.beginPath();
+        ctx.arc(0, -54, 27, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.08)';
+        ctx.beginPath();
+        ctx.arc(-6, -60, 14, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.restore();
+    }
+
+    function drawVectorFruit(ctx, f) {
+        const bob = Math.sin(performance.now() * 0.004 + f.bobPhase) * 2.5;
+        ctx.save();
+        ctx.translate(f.x, f.y + bob);
+
+        ctx.fillStyle = 'rgba(0,0,0,0.12)';
+        ctx.beginPath();
+        ctx.ellipse(0, 10 - bob, f.spec.radius * 0.9, 4, 0, 0, Math.PI * 2);
+        ctx.fill();
+
+        if (f.type === 'apple') {
+            ctx.fillStyle = '#ef4444';
+            ctx.strokeStyle = '#1e293b';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.arc(0, 0, 9.5, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.stroke();
+            ctx.fillStyle = '#22c55e';
+            ctx.beginPath();
+            ctx.ellipse(3, -10, 4, 2.2, -0.5, 0, Math.PI * 2);
+            ctx.fill();
+        } else if (f.type === 'mango') {
+            ctx.fillStyle = '#f59e0b';
+            ctx.strokeStyle = '#1e293b';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.ellipse(0, 0, 11, 8.5, -0.3, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.stroke();
+            ctx.fillStyle = '#fef08a';
+            ctx.beginPath();
+            ctx.arc(-3, -2, 3, 0, Math.PI * 2);
+            ctx.fill();
+        } else {
+            ctx.fillStyle = '#06b6d4';
+            ctx.strokeStyle = '#0f172a';
+            ctx.lineWidth = 2.5;
+            ctx.beginPath();
+            ctx.arc(0, 0, 13, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.stroke();
+            ctx.strokeStyle = '#cffafe';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.arc(0, 0, 8, -0.8, 0.8);
+            ctx.stroke();
+        }
+        ctx.restore();
+    }
+
+    function drawPillAnimal(ctx, anim, rider) {
+        ctx.save();
+        ctx.translate(anim.x, anim.y);
+
+        ctx.fillStyle = 'rgba(20, 50, 25, 0.16)';
+        ctx.beginPath();
+        ctx.ellipse(0, 22, 34, 9, 0, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.scale(anim.facing, 1);
+
+        const swing = Math.sin(anim.legPhase) * 6;
+        const swingOpp = Math.sin(anim.legPhase + Math.PI) * 6;
+
+        if (anim.type === 'cow') {
+            ctx.fillStyle = '#111827';
+            drawRoundedRect(ctx, -22 + swing * 0.5, 4, 5.5, 19, 2.5);
+            ctx.fill();
+            drawRoundedRect(ctx, -12 + swingOpp * 0.5, 4, 5.5, 19, 2.5);
+            ctx.fill();
+            drawRoundedRect(ctx, 10 + swingOpp * 0.5, 4, 5.5, 19, 2.5);
+            ctx.fill();
+            drawRoundedRect(ctx, 20 + swing * 0.5, 4, 5.5, 19, 2.5);
+            ctx.fill();
+
+            ctx.strokeStyle = '#111827';
+            ctx.lineWidth = 3.2;
+            ctx.lineCap = 'round';
+            ctx.beginPath();
+            ctx.moveTo(-28, -8);
+            ctx.quadraticCurveTo(-36, -4, -34, 6);
+            ctx.stroke();
+
+            ctx.fillStyle = '#ffffff';
+            ctx.strokeStyle = '#111827';
+            ctx.lineWidth = 3.2;
+            drawRoundedRect(ctx, -28, -18, 56, 28, 14);
+            ctx.fill();
+            ctx.stroke();
+
+            ctx.fillStyle = '#111827';
+            ctx.beginPath();
+            ctx.ellipse(-12, -6, 8, 5.5, -0.4, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.beginPath();
+            ctx.ellipse(10, -2, 6, 7, 0.2, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.fillStyle = '#ffffff';
+            ctx.strokeStyle = '#111827';
+            ctx.lineWidth = 3;
+            drawRoundedRect(ctx, 20, -28, 22, 20, 7);
+            ctx.fill();
+            ctx.stroke();
+
+            ctx.strokeStyle = '#111827';
+            ctx.lineWidth = 2.8;
+            ctx.beginPath();
+            ctx.moveTo(25, -28);
+            ctx.quadraticCurveTo(22, -36, 27, -37);
+            ctx.moveTo(36, -28);
+            ctx.quadraticCurveTo(39, -36, 34, -37);
+            ctx.stroke();
+
+            ctx.fillStyle = '#111827';
+            ctx.beginPath();
+            ctx.arc(31, -21, 1.8, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.fillStyle = '#f4979c';
+            ctx.strokeStyle = '#111827';
+            ctx.lineWidth = 2.8;
+            drawRoundedRect(ctx, 23, -15, 19, 10, 5);
+            ctx.fill();
+            ctx.stroke();
+
+        } else {
+            const isStag = anim.type === 'stag';
+            const isStrider = anim.type === 'strider';
+
+            const coatColor = isStrider ? '#f59e0b' : (isStag ? '#9c5221' : '#7a4928');
+            const legColor = isStrider ? '#d97706' : '#5c3419';
+
+            ctx.fillStyle = legColor;
+            drawRoundedRect(ctx, -22 + swing * 0.6, 2, 5.5, 21, 2.5);
+            ctx.fill();
+            drawRoundedRect(ctx, -11 + swingOpp * 0.6, 2, 5.5, 21, 2.5);
+            ctx.fill();
+            drawRoundedRect(ctx, 10 + swingOpp * 0.6, 2, 5.5, 21, 2.5);
+            ctx.fill();
+            drawRoundedRect(ctx, 20 + swing * 0.6, 2, 5.5, 21, 2.5);
+            ctx.fill();
+
+            ctx.strokeStyle = isStrider ? '#fef08a' : '#27170c';
+            ctx.lineWidth = 4.2;
+            ctx.lineCap = 'round';
+            ctx.beginPath();
+            ctx.moveTo(-27, -11);
+            ctx.quadraticCurveTo(-37, -8, -35, 5);
+            ctx.stroke();
+
+            ctx.fillStyle = coatColor;
+            drawRoundedRect(ctx, -28, -17, 56, 25, 12.5);
+            ctx.fill();
+
+            ctx.save();
+            ctx.translate(20, -12);
+            ctx.rotate(-0.55);
+            ctx.fillStyle = coatColor;
+            drawRoundedRect(ctx, -6, -24, 14, 28, 6);
+            ctx.fill();
+
+            ctx.rotate(0.75);
+            drawRoundedRect(ctx, 2, -23, 21, 12, 5.5);
+            ctx.fill();
+
+            ctx.beginPath();
+            ctx.moveTo(4, -22);
+            ctx.lineTo(7, -30);
+            ctx.lineTo(11, -22);
+            ctx.closePath();
+            ctx.fill();
+
+            if (isStag) {
+                ctx.strokeStyle = '#fde68a';
+                ctx.lineWidth = 2.8;
+                ctx.beginPath();
+                ctx.moveTo(6, -25);
+                ctx.lineTo(2, -40);
+                ctx.lineTo(-5, -45);
+                ctx.moveTo(2, -35);
+                ctx.lineTo(9, -42);
+                ctx.stroke();
+            } else if (isStrider) {
+                ctx.fillStyle = '#fef08a';
+                ctx.beginPath();
+                ctx.moveTo(4, -24);
+                ctx.lineTo(8, -35);
+                ctx.lineTo(13, -24);
+                ctx.fill();
+            }
+            ctx.restore();
+
+            ctx.fillStyle = isStrider ? '#1e1b4b' : '#18181b';
+            drawRoundedRect(ctx, -11, -21, 20, 7, 3.5);
+            ctx.fill();
+
+            ctx.strokeStyle = '#18181b';
+            ctx.lineWidth = 3.2;
+            ctx.beginPath();
+            ctx.moveTo(15, -6);
+            ctx.lineTo(22, -24);
+            ctx.stroke();
+        }
+
+        ctx.restore();
+    }
+
+    function drawRiderAndMount(ctx, r) {
+        if (r.mount) {
+            drawPillAnimal(ctx, r.mount, r);
+
+            ctx.save();
+            ctx.translate(r.x, r.y);
+            ctx.scale(r.facing, 1);
+
+            const bounce = Math.abs(Math.sin(r.walkPhase)) * 2.5;
+
+            ctx.strokeStyle = '#111827';
+            ctx.lineWidth = 4.5;
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+            ctx.beginPath();
+            ctx.moveTo(-2, -20 - bounce);
+            ctx.lineTo(5, -8 - bounce * 0.5);
+            ctx.lineTo(2, 2);
+            ctx.stroke();
+
+            ctx.lineWidth = 5.5;
+            ctx.beginPath();
+            ctx.moveTo(-2, -20 - bounce);
+            ctx.lineTo(-2, -38 - bounce);
+            ctx.stroke();
+
+            ctx.fillStyle = r.color;
+            drawRoundedRect(ctx, -6.5, -37 - bounce, 9, 12, 4);
+            ctx.fill();
+
+            const scarfWave = Math.sin(r.walkPhase * 1.2) * 3;
+            ctx.strokeStyle = r.color;
+            ctx.lineWidth = 4;
+            ctx.beginPath();
+            ctx.moveTo(-5, -35 - bounce);
+            ctx.quadraticCurveTo(-15, -36 - bounce + scarfWave, -21, -31 - bounce + scarfWave);
+            ctx.stroke();
+
+            ctx.strokeStyle = '#111827';
+            ctx.lineWidth = 4;
+            ctx.beginPath();
+            ctx.moveTo(-1, -34 - bounce);
+            ctx.lineTo(10, -26 - bounce);
+            ctx.lineTo(18, -22);
+            ctx.stroke();
+
+            ctx.fillStyle = '#111827';
+            ctx.beginPath();
+            ctx.arc(-1, -47 - bounce, 7.5, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.restore();
+        } else {
+            ctx.save();
+            ctx.translate(r.x, r.y);
+
+            ctx.fillStyle = 'rgba(20, 50, 25, 0.16)';
+            ctx.beginPath();
+            ctx.ellipse(0, 16, 13, 5, 0, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.scale(r.facing, 1);
+
+            const isMoving = Math.hypot(r.vx, r.vy) > 5;
+            const swing = isMoving ? Math.sin(r.walkPhase) * 9 : 0;
+
+            ctx.strokeStyle = '#111827';
+            ctx.lineWidth = 4.5;
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+
+            ctx.beginPath();
+            ctx.moveTo(0, -4);
+            ctx.lineTo(-swing, 14);
+            ctx.moveTo(0, -4);
+            ctx.lineTo(swing, 14);
+            ctx.stroke();
+
+            ctx.lineWidth = 4;
+            ctx.beginPath();
+            ctx.moveTo(0, -20);
+            ctx.lineTo(-swing * 0.8, -6);
+            ctx.stroke();
+
+            ctx.lineWidth = 5.5;
+            ctx.beginPath();
+            ctx.moveTo(0, -4);
+            ctx.lineTo(0, -23);
+            ctx.stroke();
+
+            ctx.fillStyle = r.color;
+            drawRoundedRect(ctx, -4.5, -22, 9, 11, 4);
+            ctx.fill();
+            ctx.strokeStyle = r.color;
+            ctx.lineWidth = 3.8;
+            ctx.beginPath();
+            ctx.moveTo(-3, -20);
+            ctx.lineTo(-14, -17 + swing * 0.25);
+            ctx.stroke();
+
+            ctx.strokeStyle = '#111827';
+            ctx.lineWidth = 4;
+            ctx.beginPath();
+            ctx.moveTo(0, -20);
+            ctx.lineTo(swing * 0.8, -6);
+            ctx.stroke();
+
+            ctx.fillStyle = '#111827';
+            ctx.beginPath();
+            ctx.arc(0, -32, 7.8, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.restore();
+        }
+
+        const tagY = r.mount ? r.y - 66 : r.y - 48;
+        ctx.save();
+        ctx.font = '700 12px Inter, sans-serif';
+        ctx.textAlign = 'center';
+        const label = `${r.name} [Lv.${r.level}]`;
+        const textW = ctx.measureText(label).width;
+
+        ctx.fillStyle = r.isBot ? 'rgba(17, 24, 39, 0.72)' : 'rgba(5, 150, 105, 0.92)';
+        drawRoundedRect(ctx, r.x - textW / 2 - 7, tagY - 11, textW + 14, 18, 9);
+        ctx.fill();
+
+        ctx.fillStyle = '#ffffff';
+        ctx.fillText(label, r.x, tagY + 2);
+
+        if (leaderboardTop10.length > 0 && leaderboardTop10[0].id === r.id) {
+            ctx.font = '16px sans-serif';
+            ctx.fillText('👑', r.x, tagY - 16);
+        }
+        ctx.restore();
+    }
+
+    function drawFloatingMapPin(ctx, wp) {
+        const bobOffset = Math.sin(wp.bobPhase) * 6;
+        const pinX = wp.x;
+        const pinY = wp.y - 42 + bobOffset;
+
+        ctx.save();
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.18)';
+        ctx.beginPath();
+        ctx.ellipse(wp.x, wp.y, 16, 6, 0, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.translate(pinX, pinY);
+        ctx.fillStyle = '#111827';
+        ctx.strokeStyle = wp.ownerId !== null ? wp.ownerColor : '#ffffff';
+        ctx.lineWidth = 3;
+
+        ctx.beginPath();
+        ctx.arc(0, -18, 18, Math.PI * 0.85, Math.PI * 0.15, false);
+        ctx.lineTo(0, 10);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+
+        ctx.fillStyle = wp.ownerId !== null ? wp.ownerColor : '#ffffff';
+        ctx.beginPath();
+        ctx.arc(0, -18, 6.8, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.font = '800 11px Inter, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillStyle = '#111827';
+        ctx.strokeStyle = 'rgba(255,255,255,0.9)';
+        ctx.lineWidth = 3;
+        ctx.strokeText(wp.name, 0, -45);
+        ctx.fillText(wp.name, 0, -45);
+
+        ctx.font = '700 10px Inter, sans-serif';
+        const ownerTxt = wp.ownerId !== null ? `Owned by ${wp.ownerName}` : 'Unclaimed (+250 XP)';
+        ctx.strokeText(ownerTxt, 0, -33);
+        ctx.fillStyle = wp.ownerId !== null ? wp.ownerColor : '#059669';
+        ctx.fillText(ownerTxt, 0, -33);
+
+        ctx.restore();
+    }
+
+    function drawPlayerCompassIndicators(ctx, p) {
+        let nearestWp = null;
+        let minWpDist = Infinity;
+        for (let i = 0; i < waypoints.length; i++) {
+            const wp = waypoints[i];
+            if (wp.ownerId === p.id) continue;
+            const d = dist(p.x, p.y, wp.x, wp.y);
+            if (d < minWpDist) {
+                minWpDist = d;
+                nearestWp = wp;
+            }
+        }
+
+        if (nearestWp && minWpDist > 180) {
+            const ang = Math.atan2(nearestWp.y - p.y, nearestWp.x - p.x);
+            const ringR = 88;
+            const ax = p.x + Math.cos(ang) * ringR;
+            const ay = p.y + Math.sin(ang) * ringR;
+
+            ctx.save();
+            ctx.translate(ax, ay);
+            ctx.rotate(ang);
+            ctx.fillStyle = '#111827';
+            ctx.strokeStyle = '#ffffff';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(12, 0);
+            ctx.lineTo(-8, -7);
+            ctx.lineTo(-4, 0);
+            ctx.lineTo(-8, 7);
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+            ctx.restore();
+        }
+    }
+
+    function drawRoundedRect(ctx, x, y, w, h, r) {
+        ctx.beginPath();
+        ctx.roundRect(x, y, w, h, r);
+    }
+
+    // --- 11. HUD, LEADERBOARD & MINIMAP UPDATES ---
+    function refreshHudAndLeaderboard() {
+        if (!humanPlayer) return;
+
+        const sorted = [...riders].sort((a, b) => b.score - a.score);
+        leaderboardTop10 = sorted.slice(0, 10);
+        playerRank = sorted.findIndex(r => r.id === humanPlayer.id) + 1;
+
+        document.getElementById('playerRankTag').textContent = `#${playerRank}`;
+        document.getElementById('hudLevelBadge').textContent = `Lv. ${humanPlayer.level}`;
+        document.getElementById('hudPinsOwned').textContent = humanPlayer.waypointsOwned;
+        document.getElementById('hudScoreVal').textContent = Math.floor(humanPlayer.score).toLocaleString();
+
+        const spdKmh = Math.round(Math.hypot(humanPlayer.vx, humanPlayer.vy) * 0.14);
+        document.getElementById('hudSpeedVal').textContent = spdKmh;
+        document.getElementById('hudCoords').textContent = `X:${Math.round(humanPlayer.x)} Y:${Math.round(humanPlayer.y)}`;
+
+        const fuelPct = clamp((humanPlayer.fuel / humanPlayer.maxFuel) * 100, 0, 100);
+        document.getElementById('hudFuelBar').style.width = `${fuelPct}%`;
+        document.getElementById('hudFuelText').textContent = `${Math.ceil(humanPlayer.fuel)} / ${humanPlayer.maxFuel}`;
+
+        const xpNeeded = humanPlayer.level * 120;
+        const xpPct = clamp((humanPlayer.xp / xpNeeded) * 100, 0, 100);
+        document.getElementById('hudXpBar').style.width = `${xpPct}%`;
+        document.getElementById('hudXpText').textContent = `${Math.floor(humanPlayer.xp)} / ${xpNeeded} XP`;
+
+        if (humanPlayer.mount) {
+            const spec = humanPlayer.mount.spec;
+            document.getElementById('hudMountEmoji').textContent = spec.emoji;
+            document.getElementById('hudMountTitle').textContent = spec.name;
+            document.getElementById('hudMountPerk').textContent = spec.perk;
+            document.getElementById('lblActionMount').textContent = 'Dismount';
+        } else {
+            document.getElementById('hudMountEmoji').textContent = '🏃';
+            document.getElementById('hudMountTitle').textContent = 'On Foot (Stickman)';
+            document.getElementById('hudMountPerk').textContent = 'Approach any animal & press SPACE / E';
+            document.getElementById('lblActionMount').textContent = 'Mount';
+        }
+
+        const nearAnimal = findNearestWildAnimal(humanPlayer, 115);
+        const promptPill = document.getElementById('mountPromptPill');
+        if (nearAnimal) {
+            promptPill.classList.remove('hidden');
+            document.getElementById('mountPromptText').textContent =
+                humanPlayer.mount ? `Swap to ${nearAnimal.spec.name}` : `Ride ${nearAnimal.spec.name}`;
+        } else {
+            promptPill.classList.add('hidden');
+        }
+
+        const onRoad = isPointOnRoad(humanPlayer.x, humanPlayer.y);
+        document.getElementById('badgeRoadBonus').classList.toggle('hidden', !onRoad);
+        document.getElementById('badgeSpeedBoost').classList.toggle('hidden', humanPlayer.boostTimer <= 0);
+        document.getElementById('badgeLowFuel').classList.toggle('hidden', humanPlayer.fuel > 22);
+
+        // Render Top 3 on Mobile (< 640px) so Leaderboard never crowds the screen, Top 10 on Desktop
+        const isMobile = screenW < 640;
+        const visibleLeaders = isMobile ? leaderboardTop10.slice(0, 3) : leaderboardTop10;
+        const lbHtml = visibleLeaders.map((r, idx) => {
+            const isMe = r.id === humanPlayer.id;
+            const mountIcon = r.mount ? r.mount.spec.emoji : '🏃';
+            return `
+                <div class="flex items-center justify-between px-1 sm:px-2 py-0.5 rounded-lg ${isMe ? 'bg-emerald-600 text-white font-bold' : 'text-slate-700'}">
+                    <div class="flex items-center gap-1 truncate">
+                        <span class="w-3 sm:w-4 text-[8px] sm:text-[10px] opacity-75">${idx === 0 ? '👑' : idx + 1 + '.'}</span>
+                        <span>${mountIcon}</span>
+                        <span class="truncate max-w-[46px] sm:max-w-[95px]">${r.name}</span>
+                    </div>
+                    <span class="font-mono text-[8px] sm:text-[11px] ml-1">${Math.floor(r.score)}</span>
+                </div>
+            `;
+        }).join('');
+        document.getElementById('leaderboardList').innerHTML = lbHtml;
+
+        renderMinimap();
+    }
+
+    function renderMinimap() {
+        const mw = minimapCanvas.width;
+        const mh = minimapCanvas.height;
+        const scale = mw / WORLD_SIZE;
+
+        miniCtx.fillStyle = '#cfead0';
+        miniCtx.fillRect(0, 0, mw, mh);
+
+        miniCtx.strokeStyle = '#d7b98e';
+        miniCtx.lineWidth = 2;
+        miniCtx.beginPath();
+        for (let i = 0; i < roadSegments.length; i++) {
+            const s = roadSegments[i];
+            miniCtx.moveTo(s.x1 * scale, s.y1 * scale);
+            miniCtx.lineTo(s.x2 * scale, s.y2 * scale);
+        }
+        miniCtx.stroke();
+
+        for (let i = 0; i < waypoints.length; i++) {
+            const wp = waypoints[i];
+            miniCtx.fillStyle = wp.ownerId !== null ? wp.ownerColor : '#111827';
+            miniCtx.beginPath();
+            miniCtx.arc(wp.x * scale, wp.y * scale, 3, 0, Math.PI * 2);
+            miniCtx.fill();
+        }
+
+        if (leaderboardTop10.length > 0) {
+            const leader = leaderboardTop10[0];
+            miniCtx.fillStyle = '#f59e0b';
+            miniCtx.beginPath();
+            miniCtx.arc(leader.x * scale, leader.y * scale, 3.5, 0, Math.PI * 2);
+            miniCtx.fill();
+        }
+
+        if (humanPlayer) {
+            miniCtx.fillStyle = '#ffffff';
+            miniCtx.strokeStyle = '#111827';
+            miniCtx.lineWidth = 2;
+            miniCtx.beginPath();
+            miniCtx.arc(humanPlayer.x * scale, humanPlayer.y * scale, 4.5, 0, Math.PI * 2);
+            miniCtx.fill();
+            miniCtx.stroke();
+        }
+    }
+
+    function findNearestWildAnimal(rider, maxDist) {
+        let best = null;
+        let bestD = maxDist;
+        for (let i = 0; i < animals.length; i++) {
+            const a = animals[i];
+            if (a.riderId !== null) continue;
+            const d = dist(rider.x, rider.y, a.x, a.y);
+            if (d < bestD) {
+                bestD = d;
+                best = a;
+            }
+        }
+        return best;
+    }
+
+    function handlePlayerMountAction() {
+        if (!humanPlayer) return;
+        SFX.init();
+        const nearAnimal = findNearestWildAnimal(humanPlayer, 115);
+        if (nearAnimal) {
+            mountAnimal(humanPlayer, nearAnimal, false);
+        } else if (humanPlayer.mount) {
+            dismountAnimal(humanPlayer, false);
+        } else {
+            showToast(`🐄 Walk close to any Cow, Horse, or Stag and press SPACE!`);
+        }
+    }
+
+    // --- 12. UI HELPERS & EVENT LISTENERS ---
+    let toastTimeout = null;
+    function showToast(message) {
+        const banner = document.getElementById('toastBanner');
+        document.getElementById('toastText').textContent = message;
+        banner.classList.remove('opacity-0', '-translate-y-4');
+        banner.classList.add('opacity-100', 'translate-y-0');
+        if (toastTimeout) clearTimeout(toastTimeout);
+        toastTimeout = setTimeout(() => {
+            banner.classList.remove('opacity-100', 'translate-y-0');
+            banner.classList.add('opacity-0', '-translate-y-4');
+        }, 2800);
+    }
+
+    function spawnFloatingText(x, y, text, color = '#111827') {
+        floatingTexts.push({ x, y, text, color, life: 1.1 });
+    }
+
+    function setupUI() {
+        const pickerRow = document.getElementById('colorPickerRow');
+        if (pickerRow) {
+            pickerRow.innerHTML = '';
+            SCARF_COLORS.forEach(c => {
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.className = `w-7 h-7 sm:w-8 sm:h-8 rounded-xl border-2 transition-transform ${c.hex === selectedScarfColor ? 'border-slate-900 scale-110 ring-2 ring-emerald-500' : 'border-white opacity-80'}`;
+                btn.style.backgroundColor = c.hex;
+                btn.onclick = () => {
+                    selectedScarfColor = c.hex;
+                    document.getElementById('hudScarfDot').style.backgroundColor = c.hex;
+                    if (humanPlayer) humanPlayer.color = c.hex;
+                    setupUI();
+                };
+                pickerRow.appendChild(btn);
+            });
+        }
+
+        window.addEventListener('resize', () => {
+            screenW = window.innerWidth;
+            screenH = window.innerHeight;
+            canvas.width = screenW;
+            canvas.height = screenH;
+        });
+        canvas.width = screenW;
+        canvas.height = screenH;
+    }
+
+    // Keyboard Controls
+    window.addEventListener('keydown', e => {
+        keys[e.code] = true;
+        if ((e.code === 'Space' || e.code === 'KeyE') && !isPaused) {
+            e.preventDefault();
+            handlePlayerMountAction();
+        }
+        if (e.code === 'Escape') {
+            const pControls = document.getElementById('popupControls');
+            const pGuide = document.getElementById('popupGuidelines');
+            if (!pControls.classList.contains('hidden') || !pGuide.classList.contains('hidden')) {
+                pControls.classList.add('hidden');
+                pGuide.classList.add('hidden');
+            } else {
+                toggleMenuModal();
+            }
+        }
+    });
+
+    window.addEventListener('keyup', e => {
+        keys[e.code] = false;
+    });
+
+    // Mouse Steering
+    window.addEventListener('mousemove', e => {
+        mouseScreen.x = e.clientX;
+        mouseScreen.y = e.clientY;
+    });
+
+    document.getElementById('btnMouseFollow').addEventListener('click', () => {
+        mouseSteerEnabled = !mouseSteerEnabled;
+        const lbl = document.getElementById('lblMouseSteer');
+        lbl.textContent = mouseSteerEnabled ? 'ON' : 'OFF';
+        lbl.className = mouseSteerEnabled ? 'text-emerald-600 font-extrabold' : 'text-slate-500';
+    });
+
+    // Touch / Virtual Joystick Controls
+    const joystickZone = document.getElementById('joystickZone');
+    const joystickKnob = document.getElementById('joystickKnob');
+
+    canvas.addEventListener('touchstart', e => {
+        if (isPaused) return;
+        SFX.init();
+        const t = e.touches[0];
+        touchJoystick.active = true;
+        touchJoystick.startX = t.clientX;
+        touchJoystick.startY = t.clientY;
+        touchJoystick.dx = 0;
+        touchJoystick.dy = 0;
+
+        joystickZone.style.left = `${clamp(t.clientX - 48, 8, screenW - 104)}px`;
+        joystickZone.style.top = `${clamp(t.clientY - 48, 8, screenH - 104)}px`;
+        joystickZone.classList.remove('hidden');
+        joystickZone.classList.add('flex');
+        joystickKnob.style.transform = `translate(0px, 0px)`;
+    }, { passive: true });
+
+    canvas.addEventListener('touchmove', e => {
+        if (!touchJoystick.active) return;
+        const t = e.touches[0];
+        const dx = t.clientX - touchJoystick.startX;
+        const dy = t.clientY - touchJoystick.startY;
+        const maxR = screenW < 640 ? 36 : 48;
+        const distVal = Math.min(maxR, Math.hypot(dx, dy));
+        const ang = Math.atan2(dy, dx);
+        touchJoystick.dx = (Math.cos(ang) * distVal) / maxR;
+        touchJoystick.dy = (Math.sin(ang) * distVal) / maxR;
+        joystickKnob.style.transform = `translate(${Math.cos(ang) * distVal}px, ${Math.sin(ang) * distVal}px)`;
+    }, { passive: true });
+
+    const endTouch = () => {
+        touchJoystick.active = false;
+        touchJoystick.dx = 0;
+        touchJoystick.dy = 0;
+        joystickZone.classList.add('hidden');
+        joystickZone.classList.remove('flex');
+    };
+    canvas.addEventListener('touchend', endTouch);
+    canvas.addEventListener('touchcancel', endTouch);
+
+    // HUD Buttons
+    document.getElementById('btnActionMount').addEventListener('click', () => {
+        handlePlayerMountAction();
+    });
+
+    const sprintBtn = document.getElementById('btnActionSprint');
+    sprintBtn.addEventListener('mousedown', () => { touchSprint = true; });
+    sprintBtn.addEventListener('mouseup', () => { touchSprint = false; });
+    sprintBtn.addEventListener('touchstart', e => { e.preventDefault(); touchSprint = true; });
+    sprintBtn.addEventListener('touchend', e => { e.preventDefault(); touchSprint = false; });
+
+    document.getElementById('btnOpenMenu').addEventListener('click', () => {
+        toggleMenuModal(true);
+    });
+
+    // Controls & CrazyGames Guidelines Sub-Popup Listeners
+    const popupControls = document.getElementById('popupControls');
+    const popupGuidelines = document.getElementById('popupGuidelines');
+
+    document.getElementById('btnOpenControlsLink').addEventListener('click', () => {
+        popupGuidelines.classList.add('hidden');
+        popupControls.classList.remove('hidden');
+    });
+    document.getElementById('btnCloseControls').addEventListener('click', () => {
+        popupControls.classList.add('hidden');
+    });
+    document.getElementById('btnCloseControlsX').addEventListener('click', () => {
+        popupControls.classList.add('hidden');
+    });
+
+    document.getElementById('btnOpenGuidelinesLink').addEventListener('click', () => {
+        popupControls.classList.add('hidden');
+        popupGuidelines.classList.remove('hidden');
+    });
+    document.getElementById('btnCloseGuidelines').addEventListener('click', () => {
+        popupGuidelines.classList.add('hidden');
+    });
+    document.getElementById('btnCloseGuidelinesX').addEventListener('click', () => {
+        popupGuidelines.classList.add('hidden');
+    });
+
+    document.getElementById('btnToggleAudio').addEventListener('click', () => {
+        SFX.init();
+        SFX.enabled = !SFX.enabled;
+        document.getElementById('iconAudioOn').classList.toggle('hidden', !SFX.enabled);
+        document.getElementById('iconAudioOff').classList.toggle('hidden', SFX.enabled);
+    });
+
+    function toggleMenuModal(forceShow = null) {
+        const modal = document.getElementById('menuModal');
+        const show = forceShow !== null ? forceShow : modal.classList.contains('hidden');
+        if (show) {
+            isPaused = true;
+            modal.classList.remove('hidden');
+            CrazySDK.gameplayStop();
+        } else {
+            isPaused = false;
+            modal.classList.add('hidden');
+            CrazySDK.gameplayStart();
+        }
+    }
+
+    // Smooth Flying Crow Transition Helper when pressing Enter Open World
+    function runWithCrowLoader(titleText, stepText, durationMs, onComplete) {
+        const overlay = document.getElementById('loadingOverlay');
+        updateLoadingProgress(18, titleText, stepText);
+        overlay.classList.remove('hidden', 'opacity-0', 'pointer-events-none');
+
+        requestAnimationFrame(() => {
+            setTimeout(() => updateLoadingProgress(62, titleText, stepText), durationMs * 0.35);
+            setTimeout(() => updateLoadingProgress(100, titleText, "Ready to ride!"), durationMs * 0.78);
+            setTimeout(() => {
+                onComplete();
+                overlay.classList.add('opacity-0', 'pointer-events-none');
+                setTimeout(() => overlay.classList.add('hidden'), 280);
+            }, durationMs);
+        });
+    }
+
+    document.getElementById('btnPlayGame').addEventListener('click', () => {
+        SFX.init();
+        const nameEl = document.getElementById('inputPlayerName');
+        const nameInput = (nameEl && nameEl.value.trim()) ? nameEl.value.trim() : 'StickNomad';
+        if (humanPlayer) {
+            humanPlayer.name = nameInput;
+            humanPlayer.color = selectedScarfColor;
+        }
+        document.getElementById('hudPlayerName').textContent = nameInput;
+        document.getElementById('hudScarfDot').style.backgroundColor = selectedScarfColor;
+
+        document.getElementById('menuModal').classList.add('hidden');
+        runWithCrowLoader('Entering Open World...', 'Syncing 100 Nomad Riders & Outposts', 600, () => {
+            toggleMenuModal(false);
+            showToast(`🌍 Welcome to NomadRide.io! Walk to the Cow or Horse & press SPACE!`);
+        });
+    });
+
+    document.getElementById('btnRewardAd').addEventListener('click', () => {
+        SFX.init();
+        CrazySDK.requestRewardedAd(() => {
+            if (!humanPlayer) return;
+            const nameEl = document.getElementById('inputPlayerName');
+            const nameInput = (nameEl && nameEl.value.trim()) ? nameEl.value.trim() : 'StickNomad';
+            humanPlayer.name = nameInput;
+            humanPlayer.color = selectedScarfColor;
+            document.getElementById('hudPlayerName').textContent = nameInput;
+            document.getElementById('hudScarfDot').style.backgroundColor = selectedScarfColor;
+
+            document.getElementById('menuModal').classList.add('hidden');
+            runWithCrowLoader('Summoning Golden Strider...', 'Filling 100% Stamina & Speed Boost', 600, () => {
+                const goldenMount = createAnimal(Date.now(), 'strider', humanPlayer.x, humanPlayer.y);
+                animals.push(goldenMount);
+                mountAnimal(humanPlayer, goldenMount, false);
+                humanPlayer.fuel = humanPlayer.maxFuel;
+                humanPlayer.boostTimer = 5.0;
+
+                toggleMenuModal(false);
+                CrazySDK.happytime();
+                showToast(`👑 Reward Claimed! Riding Golden Caravan Strider + 100% Fuel!`);
+            });
+        });
+    });
+
+    // --- 13. MAIN ANIMATION LOOP & NON-BLOCKING STARTUP ---
+    let lastFrameTime = performance.now();
+    function gameLoop(now) {
+        const dt = Math.min(0.05, (now - lastFrameTime) / 1000);
+        lastFrameTime = now;
+
+        if (!isPaused) {
+            updateGame(dt);
+        }
+        renderGame();
+        requestAnimationFrame(gameLoop);
+    }
+
+    window.onload = async function () {
+        setupUI();
+        updateLoadingProgress(12, "Scouting Open World...", "Connecting CrazyGames SDK...");
+        CrazySDK.init(); // Non-blocking
+
+        await initWorldAsync();
+        refreshHudAndLeaderboard();
+        requestAnimationFrame(gameLoop);
+
+        // Smoothly fade out the Flying Crow Loader once world is 100% ready
+        setTimeout(() => {
+            const overlay = document.getElementById('loadingOverlay');
+            overlay.classList.add('opacity-0', 'pointer-events-none');
+            setTimeout(() => overlay.classList.add('hidden'), 300);
+        }, 180);
+    };
+    </script>
+</body>
+</html>
